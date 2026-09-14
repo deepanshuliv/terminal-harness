@@ -1,105 +1,70 @@
-# Chi Agent (Opencode CLI)
+# Opencode
 
-An intelligent AI coding assistant for your terminal. It understands your coding requests, creates step-by-step plans, writes best practices, and uses helper AI agents to get tasks done quickly and safely.
+A terminal-based AI coding assistant that executes tasks through a coordinator and subagent architecture.
 
----
+Opencode accepts a natural language prompt, breaks it down into a dependency graph of steps, and executes independent tasks concurrently using provider-specific tool capabilities.
 
-## 🚀 Key Features
+## Quick Start
 
-### Works with Popular AI Models
-- **Multiple AI Providers**: Supports Google Gemini, OpenAI (GPT models), and Anthropic Claude.
-- **Easy Provider Switching**: Remembers your active AI provider, model, and API keys in a local file (`database.json`).
-
-### Smart Coordinator & Helper Agents
-- **Task Delegation**: A main coordinator AI breaks your request into smaller tasks and creates helper AI agents to work on them.
-- **Automatic Best Practices**: Automatically writes coding guidelines for your project and shares them with helper agents before they start coding.
-
-### Runs Tasks in Parallel
-- **Smart Planning**: Organizes tools and actions into a step-by-step plan and runs independent tasks at the same time to save time.
-
-### Built-in Safety Checks
-- **Asks Before Risky Actions**: Asks for your permission before running dangerous commands like deleting files (`rm`).
-- **Activity Tracking**: Tracks tool activity before and after execution to show progress clearly.
-
----
-
-## 🛠️ Tools Available
-
-- **`zsh`**: Runs terminal and shell commands.
-- **`file_write`**: Creates or edits files on your computer.
-- **`read_file`**: Reads text from a file.
-- **`grep_search`**: Searches for specific text across files in a folder.
-- **`find_files`**: Finds files by name in your project.
-- **`git`**: Runs Git commands (`status`, `diff`, `commit`, etc.).
-- **`create_a_subagent`**: Creates helper AI agents for specific jobs.
-- **`plan_maker`**: Creates an ordered list of steps to execute.
-- **`skill_maker`**: Writes coding rules and tips for helper agents to follow.
-
----
-
-## 🛡️ Edge Cases Covered
-
-### 1. Prevents File Overwriting Errors
-- **Safe Simultaneous File Edits**: If multiple tasks try to write to the same file at once, it queues them up so file content doesn't get corrupted.
-
-### 2. Stops Accidental File Deletion
-- **Safety Prompt for Dangerous Commands**: Automatically detects risky commands like `rm` and pauses to ask for your approval (`y/n`).
-
-### 3. Prevents Terminal Freezes
-- **Automatic Timeouts**: Places time limits on background commands (30 seconds for shell commands, 15 seconds for Git) so the tool never freezes infinitely.
-
-### 4. Cleans Up Search Results
-- **Ignores Unnecessary Folders**: Automatically skips huge folders like `node_modules` and `.git` when searching for files, keeping search fast and clean.
-
-### 5. Handles Provider Name Typos
-- **Smart Provider Match**: Understands simple variations (like using `gemini` for `google`) and falls back smoothly to your active session settings.
-
----
-
-## ⚡ Quickstart Guide
-
-### 1. Prerequisites
-Make sure you have [Bun](https://bun.sh) installed:
+Opencode requires [Bun](https://bun.sh) to run.
 
 ```bash
-bun --version
-```
-
-### 2. Install Dependencies
-Install required packages:
-
-```bash
+# Install dependencies
 bun install
-```
 
-### 3. Log In to an AI Provider
-Set up your API key for your chosen provider:
-
-```bash
-# For Google Gemini
-bun run cli.ts providers login -p google -a YOUR_API_KEY
-
-# For OpenAI
-bun run cli.ts providers login -p openai -a YOUR_API_KEY
-
-# For Anthropic Claude
-bun run cli.ts providers login -p claude -a YOUR_API_KEY
-```
-
-### 4. Pick Your AI Model
-List available models and pick the one you want to use:
-
-```bash
-# View available models
-bun run cli.ts models ls
+# Authenticate with an AI provider (google, openai, or claude)
+bun run cli.ts providers login -p google -a <YOUR_API_KEY>
 
 # Select a model
 bun run cli.ts models set -m gemini-3.5-flash
+
+# Run a task
+bun run cli.ts agent -p "Search for all instances of console.log and remove them"
 ```
 
-### 5. Start Using the Agent
-Run coding tasks directly from your terminal:
+## Features
+
+- **Multi-provider**: Supports Google (Gemini), OpenAI, and Anthropic Claude.
+- **Concurrent Execution**: A `plan_maker` tool builds a task dependency graph. The internal scheduler executes tasks without dependencies in parallel.
+- **Agent Delegation**: A coordinator agent plans the work and delegates file system and terminal operations to subagents.
+- **Best Practices Injection**: The coordinator generates context-specific best practices using `skill_maker` and injects them into subagent prompts.
+- **Safe Execution**: Terminal commands containing `rm` require explicit `y/n` confirmation before execution.
+
+## Architecture
+
+Opencode separates planning from execution:
+
+1. **Coordinator**: Evaluates the user prompt and delegates work using `create_a_subagent` and `plan_maker`. It does not execute terminal commands directly.
+2. **Subagents**: Spawned by the coordinator, these agents execute terminal commands (`zsh`), file operations (`file_write`, `read_file`, `grep_search`, `find_files`), and Git operations (`git`).
+3. **Scheduler**: A custom queue resolves dependencies from the execution plan and runs parallel workers.
+
+## Configuration
+
+Credentials and model preferences are stored in a `database.json` file created in the directory where the CLI is run.
 
 ```bash
-bun run cli.ts agent -p "Check git status and explain the recent changes"
+# Switch providers
+bun run cli.ts providers login -p claude -a <API_KEY>
+
+# List available models for the active provider
+bun run cli.ts models ls
 ```
+
+## Development
+
+The CLI is built with [Commander.js](https://github.com/tj/commander.js) and TypeScript.
+
+```bash
+# Check formatting
+bun run format:check
+
+# Format files
+bun run format
+```
+
+## Limitations
+
+- State persistence (`database.json`) is currently scoped to `process.cwd()` rather than a global configuration directory.
+- The `zsh` tool executes commands with a hardcoded 30-second timeout.
+- The `git` tool executes with a hardcoded 15-second timeout.
+- Concurrent file writes are queued via a local lock to prevent race conditions, which relies on single-process memory.

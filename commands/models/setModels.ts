@@ -3,7 +3,6 @@ import {
   getCurrentSession,
   PROVIDERS_MODELS,
   updateProviderModel,
-  type PROVIDERS_TYPES,
 } from '../../utils/share';
 
 export const setModel = new Command('set')

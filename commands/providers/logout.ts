@@ -18,7 +18,6 @@ export const logoutCommand = new Command('logout')
       console.error('No session TO logout');
       process.exit(1);
     }
-    // TODO: update it delete session of a particular provider
 
     const providerToDelete = (Object.keys(data) as PROVIDERS_TYPES[]).find(
       (provider) => {

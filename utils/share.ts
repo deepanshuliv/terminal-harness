@@ -20,7 +20,7 @@ interface PesistedSession {
   active: boolean;
 }
 
-interface CurrentSessionProvider {
+export interface CurrentSessionProvider {
   apiKey: string;
   model: MODELS_SUPPORTED_TYPE;
   client: GoogleGenAI | OpenAI | Anthropic;
@@ -181,7 +181,6 @@ async function getCurrentSession(): Promise<CurrentSessionProvider> {
 export {
   PROVIDERS_MODELS,
   type PROVIDERS_TYPES,
-  type MODELS_SUPPORTED_TYPE,
   getCurrentSession,
   getAllSessions,
   updateProviderModel,

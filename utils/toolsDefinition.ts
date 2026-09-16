@@ -1,4 +1,3 @@
-import { file } from 'bun';
 import { exec } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
@@ -6,13 +5,11 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-
 const lock = new Map<string, Promise<void>>();
 
 export type toolReturnType =
   | { success: true; data: unknown }
   | { success: false; errorMessage: string };
-
 
 export async function bashTool(command: string): Promise<toolReturnType> {
   try {
@@ -32,11 +29,11 @@ export async function writeFileTool(
   content: string,
 ): Promise<toolReturnType> {
   try {
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-      const existing = lock.get(filePath) ?? Promise.resolve();
+    const existing = lock.get(filePath) ?? Promise.resolve();
 
-      const myTurn = existing.then(() => fs.writeFile(filePath, content));
+    const myTurn = existing.then(() => fs.writeFile(filePath, content));
     lock.set(filePath, myTurn);
 
     await myTurn;

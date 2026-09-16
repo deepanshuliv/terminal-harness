@@ -65,6 +65,30 @@ const ReadToFile: Ttool = {
   },
 };
 
+const ReadToolOutput: Ttool = {
+  name: 'tool_output_read',
+  descripiton:
+    'Read a bounded range from a previously externalized tool output using its outputId.',
+  options: {
+    type: 'object',
+    properties: {
+      outputId: {
+        type: 'string',
+        description: 'The outputId returned with a truncated tool result',
+      },
+      start: {
+        type: 'number',
+        description: 'Optional character offset, default 0',
+      },
+      end: {
+        type: 'number',
+        description: 'Optional exclusive character offset',
+      },
+    },
+    required: ['outputId'],
+  },
+};
+
 const createSubAgent: Ttool = {
   name: 'create_a_subagent',
   descripiton: 'create a subagent that do work',
@@ -216,6 +240,7 @@ export const ALL_TOOLS: Ttool[] = [
   zshCommands,
   WriteToFile,
   ReadToFile,
+  ReadToolOutput,
   createSubAgent,
   grepSearch,
   findFiles,

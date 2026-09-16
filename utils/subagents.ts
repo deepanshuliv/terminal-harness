@@ -1,148 +1,248 @@
-import { FunctionDeclaration, GoogleGenAI } from '@google/genai';
-import { getCurrentSession, PROVIDERS_TYPES } from './share';
-import { getAllToolsOfProviders } from './providersToolAdapter';
-import { dispatchTool } from '../commands/agent';
+import { GoogleGenAI, type FunctionDeclaration } from '@google/genai';
 import Anthropic from '@anthropic-ai/sdk';
-import { Hooks } from './lifecycleHooks';
 import OpenAI from 'openai';
+import { dispatchTool } from '../commands/agent';
+import { getAllToolsOfProviders } from './providersToolAdapter';
+import { getCurrentSession, PROVIDERS_TYPES } from './share';
+import { Hooks } from './lifecycleHooks';
 import { toolReturnType } from './toolsDefinition';
+import {
+  ContextBudgetManager,
+  SubagentContextManager,
+  type ToolOutputManager,
+} from './runtime';
+
+export interface SubagentExecutionOptions {
+  outputManager?: ToolOutputManager;
+  taskId?: string;
+  runId?: string;
+}
+
+class BoundedObservationLog {
+  private readonly observations: string[] = [];
+
+  add(toolName: string, result: string): void {
+    this.observations.push(
+      `${toolName}: ${result.length > 4000 ? `${result.slice(0, 1800)}\n...[bounded]...\n${result.slice(-1800)}` : result}`,
+    );
+    while (this.render().length > 12_000 && this.observations.length > 1) {
+      this.observations.shift();
+    }
+  }
+
+  render(): string {
+    return this.observations.length
+      ? this.observations.join('\n\n')
+      : '(No tool observations yet.)';
+  }
+}
+
+class IsolatedSubagentExecutor {
+  private readonly budgetManager = new ContextBudgetManager({
+    contextCapacityTokens: 32_000,
+    responseReserveTokens: 4_096,
+    safetyReserveTokens: 1_024,
+  });
+  private readonly observations = new BoundedObservationLog();
+
+  constructor(
+    private readonly session: Awaited<ReturnType<typeof getCurrentSession>>,
+    private readonly provider: PROVIDERS_TYPES,
+    private readonly query: string,
+    private readonly isolatedContext: string,
+    private readonly hooks: Hooks,
+    private readonly options: SubagentExecutionOptions,
+  ) {}
+
+  async run(): Promise<toolReturnType> {
+    const maxIterations = 200;
+    for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+      const prompt = this.nextPrompt();
+      this.budgetManager.assertPromptWithinBudget(
+        this.budgetManager.estimate(`${this.isolatedContext}\n${prompt}`),
+      );
+      const response = await this.complete(prompt);
+      if (response.toolCalls.length === 0) {
+        return {
+          success: true,
+          data: JSON.stringify(
+            SubagentContextManager.normalizeResult(response.text),
+          ),
+        };
+      }
+      for (const call of response.toolCalls) {
+        const result = await dispatchTool(
+          call.name,
+          call.args,
+          this.hooks,
+          this.options,
+        );
+        if (this.options.outputManager) {
+          const managed = await this.options.outputManager.capture({
+            taskId: this.options.taskId,
+            runId: this.options.runId,
+            toolCallId: crypto.randomUUID(),
+            toolName: call.name,
+            command:
+              typeof call.args.comand === 'string'
+                ? call.args.comand
+                : undefined,
+            result,
+          });
+          this.observations.add(call.name, managed.modelRepresentation);
+        } else {
+          this.observations.add(call.name, result);
+        }
+      }
+    }
+    return {
+      success: false,
+      errorMessage: `Subagent reached its bounded iteration limit (${maxIterations})`,
+    };
+  }
+
+  private nextPrompt(): string {
+    return [
+      this.query,
+      '## RECENT TOOL OBSERVATIONS',
+      this.observations.render(),
+      'Continue the assigned work. Re-read files when details are needed; do not assume the complete prior transcript is available.',
+    ].join('\n\n');
+  }
+
+  private async complete(prompt: string): Promise<{
+    text?: string;
+    toolCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  }> {
+    if (
+      this.provider === 'google' &&
+      this.session.client instanceof GoogleGenAI
+    ) {
+      const tools = getAllToolsOfProviders('google') as FunctionDeclaration[];
+      const response = await this.session.client.models.generateContent({
+        model: this.session.model,
+        contents: prompt,
+        config: {
+          systemInstruction: this.isolatedContext,
+          tools: [{ functionDeclarations: tools }],
+        },
+      });
+      return {
+        text: response.text,
+        toolCalls: (response.functionCalls ?? []).map((call) => ({
+          name: call.name ?? '',
+          args: (call.args ?? {}) as Record<string, unknown>,
+        })),
+      };
+    }
+
+    if (
+      this.provider === 'claude' &&
+      this.session.client instanceof Anthropic
+    ) {
+      const tools = getAllToolsOfProviders(
+        'claude',
+      ) as unknown as Anthropic.ToolUnion[];
+      const response = await this.session.client.messages.create({
+        model: this.session.model,
+        max_tokens: 4096,
+        system: this.isolatedContext,
+        messages: [{ role: 'user', content: prompt }],
+        tools,
+      });
+      return {
+        text:
+          response.content
+            .filter(
+              (block): block is Anthropic.TextBlock => block.type === 'text',
+            )
+            .map((block) => block.text)
+            .join('\n') || undefined,
+        toolCalls: response.content
+          .filter(
+            (block): block is Anthropic.ToolUseBlock =>
+              block.type === 'tool_use',
+          )
+          .map((block) => ({
+            name: block.name,
+            args: block.input as Record<string, unknown>,
+          })),
+      };
+    }
+
+    if (this.provider === 'openai' && this.session.client instanceof OpenAI) {
+      const tools = getAllToolsOfProviders(
+        'openai',
+      ) as unknown as OpenAI.Chat.ChatCompletionTool[];
+      const response = await this.session.client.chat.completions.create({
+        model: this.session.model,
+        messages: [
+          { role: 'system', content: this.isolatedContext },
+          { role: 'user', content: prompt },
+        ],
+        tools,
+      });
+      const message = response.choices[0]?.message;
+      return {
+        text: message?.content ?? undefined,
+        toolCalls: (message?.tool_calls ?? [])
+          .filter((call) => call.type === 'function')
+          .map((call) => {
+            const functionCall =
+              call as OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall;
+            return {
+              name: functionCall.function.name,
+              args: this.parseArguments(functionCall.function.arguments),
+            };
+          }),
+      };
+    }
+
+    return { toolCalls: [] };
+  }
+
+  private parseArguments(value: string): Record<string, unknown> {
+    try {
+      return JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      return { __invalidToolArguments: value.slice(0, 1000) };
+    }
+  }
+}
 
 export async function intializeSubAgents(
   provider: PROVIDERS_TYPES,
   query: string,
   systemPrompt: string,
   hooks: Hooks,
+  options: SubagentExecutionOptions = {},
 ): Promise<toolReturnType> {
   const session = await getCurrentSession();
-  
+  const isolatedContext = new SubagentContextManager(
+    new ContextBudgetManager({
+      contextCapacityTokens: 32_000,
+      responseReserveTokens: 4_096,
+      safetyReserveTokens: 1_024,
+    }),
+  ).build({
+    assignedObjective: query,
+    systemPrompt,
+    expectedOutput:
+      'Complete the assigned work using the available tools and return only a concise structured result.',
+  });
   let normalizedProvider = (provider || '').toLowerCase().trim();
-  if (normalizedProvider === 'gemini') {
-    normalizedProvider = 'google';
-  }
-  if (normalizedProvider !== session.provider) {
+  if (normalizedProvider === 'gemini') normalizedProvider = 'google';
+  if (normalizedProvider !== session.provider)
     normalizedProvider = session.provider;
+  if (!['google', 'openai', 'claude'].includes(normalizedProvider)) {
+    return { success: false, errorMessage: 'subagent provider is unsupported' };
   }
-
-  if (normalizedProvider === 'google' && session.client instanceof GoogleGenAI) {
-    const tools = getAllToolsOfProviders('google') as FunctionDeclaration[];
-
-    const chat = session.client.chats.create({
-      model: session.model!,
-      config: {
-        systemInstruction: systemPrompt,
-        tools: [{ functionDeclarations: tools }],
-      },
-    });
-    let response = await chat.sendMessage({ message: query });
-
-    while (response.functionCalls && response.functionCalls.length > 0) {
-      const toolResults: any[] = [];
-      for (const fc of response.functionCalls) {
-        const result = await dispatchTool(fc.name!, fc.args!, hooks);
-        toolResults.push({
-          functionResponse: { name: fc.name!, response: { result } },
-        });
-      }
-      response = await chat.sendMessage({ message: toolResults });
-    }
-
-    return { success: true, data: response.text };
-  } else if (normalizedProvider === 'claude' && session.client instanceof Anthropic) {
-    const messages: Anthropic.MessageParam[] = [
-      { role: 'user', content: query },
-    ];
-    const tools = getAllToolsOfProviders(
-      'claude',
-    ) as unknown as Anthropic.ToolUnion[];
-    let response = await session.client.messages.create({
-      model: session.model,
-      messages: messages,
-      max_tokens: 4092,
-      tools: tools,
-    });
-
-    while (response.stop_reason === 'tool_use') {
-      messages.push({ role: 'assistant', content: response.content });
-
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
-      for (const block of response.content) {
-        if (block.type === 'tool_use') {
-          const result = await dispatchTool(
-            block.name,
-            block.input as Record<string, unknown>,
-            hooks,
-          );
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
-      }
-      messages.push({ role: 'user', content: toolResults });
-
-      response = await session.client.messages.create({
-        model: session.model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages,
-        tools,
-      });
-    }
-    const textBlock = response.content.find((b) => b.type === 'text');
-    if (textBlock && textBlock.type === 'text') {
-      return { success: true, data: textBlock.text };
-    }
-  } else if (
-    normalizedProvider === 'openai' &&
-    session.apiKey &&
-    session.client instanceof OpenAI
-  ) {
-    const tools = getAllToolsOfProviders(
-      'openai',
-    )! as unknown as OpenAI.Chat.ChatCompletionTool[];
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: query },
-    ];
-
-    let response = await session.client.chat.completions.create({
-      model: session.model,
-      messages,
-      tools,
-    });
-
-    while (response.choices[0].finish_reason === 'tool_calls') {
-      const assistantMsg = response.choices[0].message;
-      messages.push(assistantMsg);
-
-      for (const toolCall of assistantMsg.tool_calls!) {
-        if (toolCall.type !== 'function') continue;
-
-        const args = JSON.parse(toolCall.function.arguments) as Record<
-          string,
-          unknown
-        >;
-        const result = await dispatchTool(toolCall.function.name, args, hooks);
-        messages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: result,
-        });
-      }
-
-      response = await session.client.chat.completions.create({
-        model: session.model,
-        messages,
-        tools,
-      });
-    }
-
-    return { success: true, data: response.choices[0].message.content };
-  }
-
-  return {
-    success: false,
-    errorMessage: 'sunagents failed to do their task',
-  };
+  return new IsolatedSubagentExecutor(
+    session,
+    normalizedProvider as PROVIDERS_TYPES,
+    query,
+    isolatedContext,
+    hooks,
+    options,
+  ).run();
 }

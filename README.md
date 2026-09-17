@@ -1,12 +1,12 @@
-# Opencode
+# Relay
 
-A terminal-based AI coding assistant that executes tasks through a coordinator and subagent architecture.
+Relay is a durable terminal coding workspace that carries tasks through coordinator and subagent runs, context compaction, verification, and restarts.
 
-Opencode accepts a natural language prompt, breaks it down into a dependency graph of steps, and executes independent tasks concurrently using provider-specific tool capabilities.
+Relay accepts a natural language prompt, breaks it down into a dependency graph of steps, and executes independent tasks concurrently using provider-specific tool capabilities.
 
 ## Quick Start
 
-Opencode requires [Bun](https://bun.sh) to run.
+Relay requires [Bun](https://bun.sh) to run.
 
 ```bash
 # Install dependencies
@@ -20,6 +20,9 @@ bun run cli.ts models set -m gemini-3.5-flash
 
 # Run a task
 bun run cli.ts agent -p "Search for all instances of console.log and remove them"
+
+# Open the interactive terminal prompt
+bun run cli.ts ui
 ```
 
 ## Features
@@ -29,14 +32,39 @@ bun run cli.ts agent -p "Search for all instances of console.log and remove them
 - **Agent Delegation**: A coordinator agent plans the work and delegates file system and terminal operations to subagents.
 - **Best Practices Injection**: The coordinator generates context-specific best practices using `skill_maker` and injects them into subagent prompts.
 - **Safe Execution**: Terminal commands containing `rm` require explicit `y/n` confirmation before execution.
+- **Ink & Ember terminal UI**: A quiet, scrollback-friendly command stream shows live state, exact commands, context rebuilds, verification, and the final response without fake reasoning or dashboard clutter.
+
+### Terminal UI
+
+The product name is **Relay**. Its theme is **Ink & Ember**: ink `#101316`, paper `#E8ECEE`, slate `#9AA5AC`, ember `#D39A6C`, quiet blue `#7DA8B8`, leaf `#8FBF9F`, amber `#D4AD73`, and brick `#D17B72`.
+
+Use `relay ui` (or `bun run cli.ts ui`) for an interactive prompt that can continue with another task, and `relay agent -p "..."` for print/automation mode. Both paths use the same durable runtime. The UI only reports observable work: commands, bounded results, context rebuilds, verification, and status transitions. It does not render hidden chain-of-thought or simulate activity with a spinner.
+
+The design decisions and intentionally excluded AI-looking patterns live in [`docs/RELAY_UI_DESIGN.md`](docs/RELAY_UI_DESIGN.md).
 
 ## Architecture
 
-Opencode separates planning from execution:
+Relay separates planning from execution:
 
 1. **Coordinator**: Evaluates the user prompt and delegates work using `create_a_subagent` and `plan_maker`. It does not execute terminal commands directly.
 2. **Subagents**: Spawned by the coordinator, these agents execute terminal commands (`zsh`), file operations (`file_write`, `read_file`, `grep_search`, `find_files`), and Git operations (`git`).
 3. **Scheduler**: A custom queue resolves dependencies from the execution plan and runs parallel workers.
+
+### Long-running execution
+
+Agent runs use a durable SQLite execution store at `.opencode/execution.sqlite` (provider credentials remain in `database.json`). The active model view is rebuilt for every iteration from bounded categories: system/project instructions, typed `TaskState`, the latest versioned summary, selected high-value events, on-demand FTS5 history, and the current input. The complete conversation is never required in memory.
+
+The runtime is split into class-based managers:
+
+- `TaskStateManager` persists objective, plan, progress, decisions, constraints, files, failures, blockers, next steps, and verification state with optimistic versions.
+- `EventStore` records observable execution facts and indexes them in SQLite FTS5 without storing hidden chain-of-thought.
+- `ContextBudgetManager` estimates tokens conservatively and reserves response/safety capacity before every provider call.
+- `ContextManager` selects mandatory and optional context by explicit priority.
+- `CompactionManager` creates versioned summaries before the budget is exhausted and falls back to deterministic TaskState reconstruction on failure.
+- `ToolOutputManager` keeps small output inline and externalizes large output under `.opencode/tool-outputs`; the `tool_output_read` tool retrieves ranges later.
+- `HistoryRetriever`, `VerificationManager`, and `CheckpointManager` provide bounded recall, evidence-driven completion, and workspace checkpoint metadata.
+
+The CLI accepts `--task-id <id>` to resume a persisted task, `--context-tokens <n>` to force a small safe capacity, `--max-iterations <n>` to bound a run, and `--verify` to run discovered project checks before a task can be marked complete.
 
 ## Configuration
 
@@ -58,13 +86,21 @@ The CLI is built with [Commander.js](https://github.com/tj/commander.js) and Typ
 # Check formatting
 bun run format:check
 
+# Typecheck, test, and bundle
+bun run typecheck
+bun test
+bun run build
+
 # Format files
 bun run format
 ```
 
 ## Limitations
 
-- State persistence (`database.json`) is currently scoped to `process.cwd()` rather than a global configuration directory.
+- Provider credentials and model preferences (`database.json`) remain scoped to `process.cwd()`; execution state is stored in `.opencode/execution.sqlite` beside the workspace.
+- The default tokenizer is a conservative character-based estimator. Provider-specific tokenizers can be injected through `TokenEstimator` when a provider tokenizer is available.
+- `--verify` is opt-in for backward-compatible CLI behavior; without it, a final response leaves the task unverified and does not falsely mark it complete.
+- Checkpoints capture Git metadata and binary diffs; automatic workspace restoration is intentionally not performed.
 - The `zsh` tool executes commands with a hardcoded 30-second timeout.
 - The `git` tool executes with a hardcoded 15-second timeout.
 - Concurrent file writes are queued via a local lock to prevent race conditions, which relies on single-process memory.

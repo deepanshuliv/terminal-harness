@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import {
   getAllSessions,
   PROVIDERS_TYPES,
-  writeAllSessionDeatilInFile,
+  writeAllSessionDetailsToFile,
 } from '../../utils/share';
 
 export const logoutCommand = new Command('logout')
@@ -30,6 +30,6 @@ export const logoutCommand = new Command('logout')
     }
 
     delete data[providerToDelete];
-    await writeAllSessionDeatilInFile(data);
+    await writeAllSessionDetailsToFile(data);
     console.log('Session logout successfully');
   });

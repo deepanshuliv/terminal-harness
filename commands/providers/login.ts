@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import {
   PROVIDERS_MODELS,
   PROVIDERS_TYPES,
+  maskSecret,
   upsertProviderInSession,
 } from '../../utils/share';
 
@@ -14,15 +15,15 @@ export const loginCommand = new Command('login')
   )
   .option('-a, --api_key <apiKey>', 'Your api key', '')
   .action(async (options) => {
-    const providerAvailabel =
+    const providerAvailable =
       PROVIDERS_MODELS[options.provider as PROVIDERS_TYPES];
-    if (!providerAvailabel) {
+    if (!providerAvailable) {
       console.error(
         `"${options.provider}" provider is not supported currently`,
       );
     }
 
-    if (providerAvailabel && options.api_key) {
+    if (providerAvailable && options.api_key) {
       try {
         await upsertProviderInSession(options.provider, {
           apiKey: options.api_key,
@@ -33,7 +34,8 @@ export const loginCommand = new Command('login')
         process.exit(1);
       }
 
-      console.log('api-key is set for provider -> ', options.provider);
-      console.log('api-key  for provider -> ', options.api_key);
+      console.log(
+        `API key ${maskSecret(options.api_key)} saved for provider ${options.provider}`,
+      );
     }
   });

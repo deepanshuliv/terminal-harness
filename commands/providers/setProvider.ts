@@ -14,9 +14,9 @@ export const setProviderCommand = new Command('set')
   )
   .action(async (options) => {
     // check for valid provider
-    const availabelProviders =
+    const availableProviders =
       PROVIDERS_MODELS[options.provider as PROVIDERS_TYPES];
-    if (!availabelProviders) {
+    if (!availableProviders) {
       console.error(
         `"${options.provider}" provider is not supported currently`,
       );

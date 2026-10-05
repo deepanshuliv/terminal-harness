@@ -5,17 +5,17 @@ import Anthropic from '@anthropic-ai/sdk';
 import { PROVIDERS_MODELS } from './modelsAndProviders';
 import { createOpenRouterClient } from './openrouter';
 
-const SESISON_FILE_PATH = `${process.cwd()}/database.json`;
+const SESSION_FILE_PATH = `${process.cwd()}/database.json`;
 
 type PROVIDERS_TYPES = keyof typeof PROVIDERS_MODELS;
 type MODELS_SUPPORTED_TYPE =
   (typeof PROVIDERS_MODELS)[keyof typeof PROVIDERS_MODELS][number];
 
-type AllSessiondetailsType = Partial<Record<PROVIDERS_TYPES, PesistedSession>>;
+type AllSessionDetailsType = Partial<Record<PROVIDERS_TYPES, PersistedSession>>;
 
-let allSessiondetails: AllSessiondetailsType = {};
+let allSessionDetails: AllSessionDetailsType = {};
 
-interface PesistedSession {
+interface PersistedSession {
   apiKey: string;
   model: MODELS_SUPPORTED_TYPE;
   active: boolean;
@@ -41,8 +41,8 @@ async function upsertProviderInSession(
   const model = options.model ?? PROVIDERS_MODELS[provider][0];
 
   try {
-    const data = await fs.readFile(SESISON_FILE_PATH, 'utf-8');
-    const parsedData = JSON.parse(data) as AllSessiondetailsType;
+    const data = await fs.readFile(SESSION_FILE_PATH, 'utf-8');
+    const parsedData = JSON.parse(data) as AllSessionDetailsType;
     if (parsedData[provider]) {
       if (options.apiKey) {
         parsedData[provider].apiKey = options.apiKey;
@@ -71,19 +71,19 @@ async function upsertProviderInSession(
           active: false,
         };
       } else {
-        throw Error('Appropriate provider is not availabel');
+        throw Error('Appropriate provider is not available');
       }
     }
 
-    await writeAllSessionDeatilInFile(parsedData);
+    await writeAllSessionDetailsToFile(parsedData);
   } catch (error) {
     if (options.apiKey) {
-      allSessiondetails[provider] = {
+      allSessionDetails[provider] = {
         active: true,
         apiKey: options.apiKey,
         model: model,
       };
-      await writeAllSessionDeatilInFile(allSessiondetails);
+      await writeAllSessionDetailsToFile(allSessionDetails);
     } else {
       throw error;
     }
@@ -111,30 +111,45 @@ async function createClient(
   return client;
 }
 
-async function writeAllSessionDeatilInFile(session: AllSessiondetailsType) {
+// database.json holds API keys, so it is kept readable by the owner only.
+// (`mode` applies when the file is created; chmod covers existing files.)
+// For unattended use prefer RELAY_PROVIDER + the provider's key variable,
+// which writes no credentials to disk.
+const SESSION_FILE_MODE = 0o600;
+
+async function writeAllSessionDetailsToFile(session: AllSessionDetailsType) {
   const content = JSON.stringify(session);
   try {
-    await fs.writeFile(SESISON_FILE_PATH, content);
+    await fs.writeFile(SESSION_FILE_PATH, content, { mode: SESSION_FILE_MODE });
+    await fs.chmod(SESSION_FILE_PATH, SESSION_FILE_MODE);
   } catch (error) {
-    throw Error('Failed to create session');
+    throw Error(
+      `Failed to save session: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
+}
+
+/** Shows enough of a secret to recognise it, never the whole value. */
+function maskSecret(secret: string): string {
+  if (secret.length <= 12) return '****';
+  return `${secret.slice(0, 6)}…${secret.slice(-4)}`;
 }
 
 async function updateProviderModel(
   provider: PROVIDERS_TYPES,
   model: MODELS_SUPPORTED_TYPE,
 ) {
-  const data = await fs.readFile(SESISON_FILE_PATH, 'utf-8');
-  const parsedData = JSON.parse(data) as AllSessiondetailsType;
+  const data = await fs.readFile(SESSION_FILE_PATH, 'utf-8');
+  const parsedData = JSON.parse(data) as AllSessionDetailsType;
 
   parsedData[provider]!.model = model;
 
-  writeAllSessionDeatilInFile(parsedData);
+  await writeAllSessionDetailsToFile(parsedData);
 }
 
-async function getAllSessions(): Promise<AllSessiondetailsType> {
-  const data = await fs.readFile(SESISON_FILE_PATH, 'utf-8');
-  const currentSessionProviders = JSON.parse(data) as AllSessiondetailsType;
+async function getAllSessions(): Promise<AllSessionDetailsType> {
+  const data = await fs.readFile(SESSION_FILE_PATH, 'utf-8');
+  const currentSessionProviders = JSON.parse(data) as AllSessionDetailsType;
 
   if (!currentSessionProviders) {
     throw Error('first login and provide provider , no provider is present');
@@ -178,8 +193,8 @@ async function getCurrentSession(): Promise<CurrentSessionProvider> {
   const envSession = await getSessionFromEnv();
   if (envSession) return envSession;
 
-  const data = await fs.readFile(SESISON_FILE_PATH, 'utf-8');
-  const parsedData = JSON.parse(data) as AllSessiondetailsType;
+  const data = await fs.readFile(SESSION_FILE_PATH, 'utf-8');
+  const parsedData = JSON.parse(data) as AllSessionDetailsType;
   if (!parsedData) {
     throw Error('no Session is present');
   }
@@ -193,7 +208,7 @@ async function getCurrentSession(): Promise<CurrentSessionProvider> {
   });
 
   if (!currentProvider) {
-    throw Error('No actiive provider  please set a provider');
+    throw Error('No active provider, please set a provider');
   }
   if (!parsedData[currentProvider]) {
     throw Error('This provider is not exists');
@@ -201,7 +216,7 @@ async function getCurrentSession(): Promise<CurrentSessionProvider> {
   const { apiKey, model } = parsedData[currentProvider];
 
   if (!apiKey) {
-    throw Error('No api key availabel');
+    throw Error('No API key available');
   }
 
   const client = await createClient(apiKey, currentProvider!);
@@ -219,7 +234,8 @@ export {
   type PROVIDERS_TYPES,
   getCurrentSession,
   getAllSessions,
+  maskSecret,
   updateProviderModel,
   upsertProviderInSession,
-  writeAllSessionDeatilInFile,
+  writeAllSessionDetailsToFile,
 };

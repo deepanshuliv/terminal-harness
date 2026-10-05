@@ -170,9 +170,12 @@ class IsolatedSubagentExecutor {
       };
     }
 
-    if (this.provider === 'openai' && this.session.client instanceof OpenAI) {
+    if (
+      (this.provider === 'openai' || this.provider === 'openrouter') &&
+      this.session.client instanceof OpenAI
+    ) {
       const tools = getAllToolsOfProviders(
-        'openai',
+        this.provider,
       ) as unknown as OpenAI.Chat.ChatCompletionTool[];
       const response = await this.session.client.chat.completions.create({
         model: this.session.model,
@@ -234,7 +237,9 @@ export async function intializeSubAgents(
   if (normalizedProvider === 'gemini') normalizedProvider = 'google';
   if (normalizedProvider !== session.provider)
     normalizedProvider = session.provider;
-  if (!['google', 'openai', 'claude'].includes(normalizedProvider)) {
+  if (
+    !['google', 'openai', 'claude', 'openrouter'].includes(normalizedProvider)
+  ) {
     return { success: false, errorMessage: 'subagent provider is unsupported' };
   }
   return new IsolatedSubagentExecutor(

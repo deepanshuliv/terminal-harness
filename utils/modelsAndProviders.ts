@@ -90,4 +90,7 @@ export const PROVIDERS_MODELS = {
     // Mythos (invite-only)
     'claude-mythos-preview',
   ],
+
+  // OpenAI-compatible gateway (https://openrouter.ai/api/v1)
+  openrouter: ['poolside/laguna-s-2.1:free', 'poolside/laguna-xs-2.1:free'],
 } as const;

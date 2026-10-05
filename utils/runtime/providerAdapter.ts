@@ -2,6 +2,7 @@ import { GoogleGenAI, type FunctionDeclaration } from '@google/genai';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { CurrentSessionProvider } from '../share';
+import { outputTokenLimit } from '../outputLimits';
 import type { ActiveContext, ModelAdapter, ModelResponse } from './types';
 
 export class GoogleModelAdapter implements ModelAdapter {
@@ -39,12 +40,13 @@ export class GoogleModelAdapter implements ModelAdapter {
 }
 
 export class OpenAIModelAdapter implements ModelAdapter {
-  readonly provider = 'openai';
+  private previousReplyTruncated = false;
 
   constructor(
     private readonly client: OpenAI,
     readonly model: string,
     private readonly tools: OpenAI.Chat.ChatCompletionTool[],
+    readonly provider: string = 'openai',
   ) {}
 
   async complete(input: {
@@ -61,10 +63,17 @@ export class OpenAIModelAdapter implements ModelAdapter {
           { role: 'user', content: providerContext(input.context) },
         ],
         tools: this.tools,
+        ...(outputTokenLimit(
+          this.provider,
+          this.previousReplyTruncated,
+        ) as object),
       },
       { signal: input.signal },
     );
     const message = response.choices[0]?.message;
+    this.previousReplyTruncated =
+      response.choices[0]?.finish_reason === 'length' &&
+      !message?.tool_calls?.length;
     return {
       text: message?.content ?? undefined,
       toolCalls: (message?.tool_calls ?? [])
@@ -166,11 +175,15 @@ export function createProviderModelAdapter(
       toolDefinitions as FunctionDeclaration[],
     );
   }
-  if (session.provider === 'openai' && session.client instanceof OpenAI) {
+  if (
+    (session.provider === 'openai' || session.provider === 'openrouter') &&
+    session.client instanceof OpenAI
+  ) {
     return new OpenAIModelAdapter(
       session.client,
       session.model,
       toolDefinitions as OpenAI.Chat.ChatCompletionTool[],
+      session.provider,
     );
   }
   if (session.provider === 'claude' && session.client instanceof Anthropic) {

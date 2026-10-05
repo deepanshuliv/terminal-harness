@@ -35,7 +35,7 @@ export function getAllToolsOfProviders(provider: PROVIDERS_TYPES) {
   if (provider === 'google') {
     return ALL_TOOLS.map((tool) => convertToGeminiTool(tool));
   }
-  if (provider === 'openai') {
+  if (provider === 'openai' || provider === 'openrouter') {
     return ALL_TOOLS.map((tool) => convertToOpenAiTool(tool));
   }
 }

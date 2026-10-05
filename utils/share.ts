@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { PROVIDERS_MODELS } from './modelsAndProviders';
+import { createOpenRouterClient } from './openrouter';
 
 const SESISON_FILE_PATH = `${process.cwd()}/database.json`;
 
@@ -98,6 +99,8 @@ async function createClient(
     client = new GoogleGenAI({ apiKey });
   } else if (apiKey && provider === 'openai') {
     client = new OpenAI({ apiKey });
+  } else if (apiKey && provider === 'openrouter') {
+    client = createOpenRouterClient(apiKey);
   } else if (apiKey && provider === 'claude') {
     client = new Anthropic({
       apiKey,
@@ -139,8 +142,41 @@ async function getAllSessions(): Promise<AllSessiondetailsType> {
   return currentSessionProviders;
 }
 
+const PROVIDER_API_KEY_ENVS: Record<PROVIDERS_TYPES, string> = {
+  google: 'GEMINI_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  claude: 'ANTHROPIC_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+};
+
+// Non-interactive environments (CI, benchmark containers) can select the
+// provider through RELAY_PROVIDER / RELAY_MODEL and the provider's standard
+// API key variable, so no credentials are written to database.json.
+async function getSessionFromEnv(): Promise<CurrentSessionProvider | null> {
+  const provider = process.env.RELAY_PROVIDER as PROVIDERS_TYPES | undefined;
+  if (!provider) return null;
+  if (!PROVIDERS_MODELS[provider]) {
+    throw Error(`RELAY_PROVIDER "${provider}" is not supported`);
+  }
+  const apiKey = process.env[PROVIDER_API_KEY_ENVS[provider]];
+  if (!apiKey) {
+    throw Error(`${PROVIDER_API_KEY_ENVS[provider]} is not set`);
+  }
+  const model = (process.env.RELAY_MODEL ||
+    PROVIDERS_MODELS[provider][0]) as MODELS_SUPPORTED_TYPE;
+  return {
+    apiKey,
+    model,
+    provider,
+    client: await createClient(apiKey, provider),
+  };
+}
+
 async function getCurrentSession(): Promise<CurrentSessionProvider> {
   if (currentSessionProvider) return currentSessionProvider;
+
+  const envSession = await getSessionFromEnv();
+  if (envSession) return envSession;
 
   const data = await fs.readFile(SESISON_FILE_PATH, 'utf-8');
   const parsedData = JSON.parse(data) as AllSessiondetailsType;

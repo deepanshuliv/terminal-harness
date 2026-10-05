@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { Database } from 'bun:sqlite';
+import { relayStateDirectory } from './database';
 import type { ManagedToolOutput, ToolOutputCaptureInput } from './types';
 
 type ToolOutputRow = {
@@ -35,8 +36,7 @@ export class ToolOutputManager {
     options: ToolOutputManagerOptions = {},
   ) {
     this.rootDirectory =
-      options.rootDirectory ??
-      path.join(process.cwd(), '.opencode', 'tool-outputs');
+      options.rootDirectory ?? path.join(relayStateDirectory(), 'tool-outputs');
     this.inlineThresholdChars = options.inlineThresholdChars ?? 8000;
     this.previewChars = options.previewChars ?? 1800;
     this.tailChars = options.tailChars ?? 2400;

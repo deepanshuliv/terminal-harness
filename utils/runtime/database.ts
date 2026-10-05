@@ -2,9 +2,31 @@ import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import path from 'path';
 
+export const STATE_DIRECTORY_NAME = '.relay';
+// Name used before the rename; still read so existing tasks stay resumable.
+export const LEGACY_STATE_DIRECTORY_NAME = '.opencode';
+
+/**
+ * Durable runtime state (SQLite, tool outputs, checkpoints) lives in
+ * `<workspace>/.relay`. RELAY_STATE_DIR relocates it outside the workspace,
+ * e.g. when the workspace is graded. A workspace that only has the legacy
+ * `.opencode/execution.sqlite` keeps using it.
+ */
+export function relayStateDirectory(workspaceRoot = process.cwd()): string {
+  if (process.env.RELAY_STATE_DIR) return process.env.RELAY_STATE_DIR;
+  const current = path.join(workspaceRoot, STATE_DIRECTORY_NAME);
+  const legacy = path.join(workspaceRoot, LEGACY_STATE_DIRECTORY_NAME);
+  if (
+    !fs.existsSync(current) &&
+    fs.existsSync(path.join(legacy, 'execution.sqlite'))
+  ) {
+    return legacy;
+  }
+  return current;
+}
+
 export const DEFAULT_EXECUTION_DATABASE = path.join(
-  process.cwd(),
-  '.opencode',
+  relayStateDirectory(),
   'execution.sqlite',
 );
 

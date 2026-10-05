@@ -1,4 +1,8 @@
-import { ExecutionDatabase, DEFAULT_EXECUTION_DATABASE } from './database';
+import {
+  ExecutionDatabase,
+  DEFAULT_EXECUTION_DATABASE,
+  relayStateDirectory,
+} from './database';
 import { CheckpointManager } from './checkpointManager';
 import {
   CompactionManager,
@@ -72,7 +76,7 @@ export function createLongRunningRuntime(options: RuntimeFactoryOptions = {}) {
     options.compactionGenerator,
   );
   const toolOutputManager = new ToolOutputManager(database.db, {
-    rootDirectory: `${options.workspaceRoot ?? process.cwd()}/.opencode/tool-outputs`,
+    rootDirectory: `${relayStateDirectory(options.workspaceRoot)}/tool-outputs`,
   });
   const verificationManager = new VerificationManager(
     taskStateManager,

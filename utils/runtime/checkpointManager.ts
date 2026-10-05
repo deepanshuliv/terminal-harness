@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { promisify } from 'util';
 import type { Database } from 'bun:sqlite';
+import { relayStateDirectory } from './database';
 import { EventStore } from './eventStore';
 
 const execFileAsync = promisify(execFile);
@@ -46,8 +47,7 @@ export class CheckpointManager {
     let patchPath: string | undefined;
     if (patch) {
       const directory = path.join(
-        this.workspaceRoot,
-        '.opencode',
+        relayStateDirectory(this.workspaceRoot),
         'checkpoints',
       );
       await fs.mkdir(directory, { recursive: true });

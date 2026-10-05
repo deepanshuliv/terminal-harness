@@ -18,6 +18,7 @@ export interface BuildContextInput {
   historyQuery?: string;
   historyFilters?: HistorySearchFilters;
   recentEventsLimit?: number;
+  recentToolResultsLimit?: number;
   retrievedHistoryLimit?: number;
   retrievedHistoryTokens?: number;
 }
@@ -36,6 +37,10 @@ export class ContextManager {
     const recentEvents = this.eventStore.listRecentHighValue(
       input.taskId,
       input.recentEventsLimit ?? 12,
+    );
+    const recentToolResults = this.eventStore.listRecentToolResults(
+      input.taskId,
+      input.recentToolResultsLimit ?? 8,
     );
     const retrievedHistory = input.historyQuery
       ? this.historyRetriever.search(
@@ -78,6 +83,17 @@ export class ContextManager {
       ),
     ];
     const optional: ContextItem[] = [
+      // The agent's own latest tool calls and their outputs: without these a
+      // rebuilt context forgets what was just read or run.
+      ...recentToolResults.map(({ finished, requested }, index) =>
+        this.item(
+          `tool-${finished.id}`,
+          'recentEvents',
+          this.renderToolResult(finished, requested),
+          false,
+          800 - index,
+        ),
+      ),
       ...recentEvents.map((event, index) =>
         this.item(
           `recent-${event.id}`,
@@ -163,6 +179,22 @@ export class ContextManager {
     return rendered.length > 12_000
       ? `${rendered.slice(0, 6000)}\n...[bounded]...\n${rendered.slice(-4000)}`
       : rendered;
+  }
+
+  private renderToolResult(
+    finished: ExecutionEvent,
+    requested?: ExecutionEvent,
+  ): string {
+    const payload = finished.payload as Record<string, unknown>;
+    const args = (requested?.payload as Record<string, unknown> | undefined)
+      ?.args;
+    const output = String(payload.modelRepresentation ?? '');
+    return [
+      `tool result (event ${finished.id}): ${String(payload.toolName)} ${JSON.stringify(args ?? {})}`,
+      output.length > 6000
+        ? `${output.slice(0, 3000)}\n...[bounded]...\n${output.slice(-2500)}`
+        : output,
+    ].join('\n');
   }
 
   private renderEvent(event: ExecutionEvent): string {

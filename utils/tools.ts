@@ -6,7 +6,7 @@ interface JsonSchema {
 
 export interface Ttool<Tparameter extends JsonSchema = JsonSchema> {
   name: string;
-  descripiton: string;
+  description: string;
   options: Tparameter;
 }
 
@@ -18,22 +18,23 @@ export type ToolCall = {
 
 const zshCommands: Ttool = {
   name: 'zsh',
-  descripiton: 'Run a shell command on zsh',
+  description:
+    'Run a shell command (bash) in the workspace and return its exit code, stdout and stderr.',
   options: {
     type: 'object',
     properties: {
-      comand: {
+      command: {
         type: 'string',
-        description: 'command to run on zsh',
+        description: 'bash command to run (non-interactive)',
       },
     },
-    required: ['comand'],
+    required: ['command'],
   },
 };
 
 const WriteToFile: Ttool = {
   name: 'file_write',
-  descripiton: 'Write content to a file at a given path',
+  description: 'Write content to a file at a given path',
   options: {
     type: 'object',
     properties: {
@@ -52,7 +53,7 @@ const WriteToFile: Ttool = {
 
 const ReadToFile: Ttool = {
   name: 'read_file',
-  descripiton: 'Read the content of a file at a given path',
+  description: 'Read the content of a file at a given path',
   options: {
     type: 'object',
     properties: {
@@ -67,7 +68,7 @@ const ReadToFile: Ttool = {
 
 const ReadToolOutput: Ttool = {
   name: 'tool_output_read',
-  descripiton:
+  description:
     'Read a bounded range from a previously externalized tool output using its outputId.',
   options: {
     type: 'object',
@@ -91,14 +92,11 @@ const ReadToolOutput: Ttool = {
 
 const createSubAgent: Ttool = {
   name: 'create_a_subagent',
-  descripiton: 'create a subagent that do work',
+  description:
+    'Delegate a self-contained piece of work to a subagent that has shell, file and git tools. It uses the same provider and model as this session.',
   options: {
     type: 'object',
     properties: {
-      provider: {
-        type: 'string',
-        description: 'provider which subagents need to build',
-      },
       systemPrompt: {
         type: 'string',
         description:
@@ -109,13 +107,13 @@ const createSubAgent: Ttool = {
         description: 'agents needs to do',
       },
     },
-    required: ['systemPrompt', 'provider', 'query'],
+    required: ['systemPrompt', 'query'],
   },
 };
 
 const grepSearch: Ttool = {
   name: 'grep_search',
-  descripiton:
+  description:
     'Search for a text pattern inside files in a directory (like grep -rn). Returns matching file paths and line numbers.',
   options: {
     type: 'object',
@@ -140,7 +138,7 @@ const grepSearch: Ttool = {
 
 const findFiles: Ttool = {
   name: 'find_files',
-  descripiton:
+  description:
     'Find files by name pattern inside a directory. Excludes node_modules and .git automatically.',
   options: {
     type: 'object',
@@ -161,7 +159,7 @@ const findFiles: Ttool = {
 
 const git: Ttool = {
   name: 'git',
-  descripiton:
+  description:
     'Run a git command in a repository. Supports status, diff, log, add, commit, branch, checkout, etc.',
   options: {
     type: 'object',
@@ -183,7 +181,7 @@ const git: Ttool = {
 
 const planMaker: Ttool = {
   name: 'plan_maker',
-  descripiton:
+  description:
     'Create an execution plan as an ordered list of tool steps with dependencies. Call this FIRST before any other tool.',
   options: {
     type: 'object',
@@ -222,13 +220,14 @@ const planMaker: Ttool = {
 
 const skillsMaker: Ttool = {
   name: 'skill_maker',
-  descripiton: 'make skills what is the best practices to do .',
+  description:
+    'Store best-practice guidance that is injected into every subagent spawned afterwards.',
   options: {
     type: 'object',
     properties: {
       skills: {
         type: 'string',
-        descripton: 'skill that need all the information and good practice',
+        description: 'Best-practice guidance for the subagents',
       },
     },
     required: [],

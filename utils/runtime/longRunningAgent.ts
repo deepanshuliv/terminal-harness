@@ -1,3 +1,4 @@
+import { commandOf, isProviderError } from '../toolArgs';
 import { ContextManager, type BuildContextInput } from './contextManager';
 import { CheckpointManager } from './checkpointManager';
 import { CompactionManager } from './compactionManager';
@@ -43,6 +44,11 @@ export interface RunTaskOptions {
   compactEveryEvents?: number;
   verifyOnFinish?: boolean;
   verificationCommands?: string[];
+  /**
+   * Reject a final answer until at least this many tool calls ran in the
+   * run (the model is nudged to act instead). Default 0 keeps old behavior.
+   */
+  minToolCallsBeforeFinish?: number;
   signal?: AbortSignal;
 }
 
@@ -76,6 +82,8 @@ export class LongRunningAgentRuntime {
     let compactions = 0;
     let finalText: string | undefined;
     let currentInput = options.currentInput;
+    let toolCallsThisRun = 0;
+    let finishNudges = 0;
     this.deps.eventStore.createRun(runId, task.sessionId, task.taskId);
     this.deps.taskStateManager.markRunning(task.taskId);
     this.deps.eventStore.append({
@@ -172,6 +180,20 @@ export class LongRunningAgentRuntime {
         });
 
         if (response.toolCalls.length === 0) {
+          // A reply cut off by the token limit is never a final answer.
+          const truncated = response.finishReason === 'length';
+          const actedTooLittle =
+            finishNudges < 2 &&
+            toolCallsThisRun < (options.minToolCallsBeforeFinish ?? 0);
+          if (truncated || actedTooLittle) {
+            if (!truncated) finishNudges += 1;
+            currentInput = `${options.currentInput}\n\n${
+              truncated
+                ? '[Relay: your previous reply was cut off by the output token limit before any tool call. Think briefly, then make the next tool call.]'
+                : '[Relay: you replied without taking any action, so nothing in the workspace has changed. Carry out the request using your tools.]'
+            }`;
+            continue;
+          }
           finalText = response.text;
           const current = this.deps.taskStateManager.require(task.taskId);
           this.deps.taskStateManager.update(task.taskId, {
@@ -239,7 +261,9 @@ export class LongRunningAgentRuntime {
           };
         }
 
+        currentInput = options.currentInput;
         for (const toolCall of response.toolCalls) {
+          toolCallsThisRun += 1;
           await this.executeTool(toolCall, {
             taskId: task.taskId,
             sessionId: task.sessionId,
@@ -392,24 +416,32 @@ export class LongRunningAgentRuntime {
           `before ${toolCall.name}`,
         );
       }
-      const result = await this.deps.toolDispatcher(
-        toolCall.name,
-        this.prepareToolArgs(toolCall, metadata.taskId),
-        {
-          taskId: metadata.taskId,
-          runId: metadata.runId,
-          agentId: metadata.agentId,
-        },
-      );
+      let result: unknown;
+      try {
+        result = await this.deps.toolDispatcher(
+          toolCall.name,
+          this.prepareToolArgs(toolCall, metadata.taskId),
+          {
+            taskId: metadata.taskId,
+            runId: metadata.runId,
+            agentId: metadata.agentId,
+          },
+        );
+      } catch (error) {
+        if (isProviderError(error)) throw error;
+        // Tool failures are observations for the model, not run failures.
+        result = {
+          success: false,
+          errorMessage: `${toolCall.name} failed: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+      result = this.withRepetitionWarning(toolCall, result);
       const managed = await this.deps.toolOutputManager.capture({
         taskId: metadata.taskId,
         runId: metadata.runId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        command:
-          typeof toolCall.args.comand === 'string'
-            ? toolCall.args.comand
-            : undefined,
+        command: commandOf(toolCall.args),
         result,
         exitCode: this.resultExitCode(result),
       });
@@ -493,17 +525,19 @@ export class LongRunningAgentRuntime {
         ? toolCall.args.fileName
         : undefined;
     const isFailure = this.isFailure(result);
+    // Record the concrete action (not just the tool name) so a coordinator
+    // whose context was rebuilt still knows exactly what was already done.
+    const action = describeAction(toolCall, result);
+    // ~3% of the context window (in characters) for each action list.
+    const ledgerChars = Math.max(
+      300,
+      Math.floor(this.deps.budgetManager.contextCapacityTokens * 4 * 0.03),
+    );
     const completedWork = isFailure
       ? current.completedWork
-      : this.keepRecentUnique(
-          [...current.completedWork, `${toolCall.name} completed`],
-          100,
-        );
+      : recordAction(current.completedWork, action, ledgerChars);
     const failedAttempts = isFailure
-      ? this.keepRecentUnique(
-          [...current.failedAttempts, `${toolCall.name} failed`],
-          100,
-        )
+      ? recordAction(current.failedAttempts, action, ledgerChars)
       : current.failedAttempts;
     const filesTouched = file
       ? this.keepRecentUnique([...current.filesTouched, file], 200)
@@ -555,6 +589,45 @@ export class LongRunningAgentRuntime {
     }
   }
 
+  private readonly callCounts = new Map<string, number>();
+
+  /**
+   * Loop breaker: after the same call (tool + identical arguments) has been
+   * made three times in this process, tell the model so in the result.
+   */
+  private withRepetitionWarning(
+    toolCall: ModelToolCall,
+    result: unknown,
+  ): unknown {
+    const signature = `${toolCall.name}:${JSON.stringify(toolCall.args)}`;
+    const count = (this.callCounts.get(signature) ?? 0) + 1;
+    this.callCounts.set(signature, count);
+    if (count < 3) return result;
+    const note = `[Relay notice: this exact ${toolCall.name} call has now been made ${count} times. Its result is unlikely to change. If the requirements are already satisfied, give your final answer; otherwise take a different action.]`;
+    let parsed: unknown = result;
+    if (typeof result === 'string') {
+      try {
+        parsed = JSON.parse(result);
+      } catch {
+        return `${result}\n${note}`;
+      }
+    }
+    if (parsed && typeof parsed === 'object') {
+      const record = { ...(parsed as Record<string, unknown>) };
+      if (typeof record.errorMessage === 'string') {
+        record.errorMessage = `${record.errorMessage}\n${note}`;
+      } else {
+        const data =
+          typeof record.data === 'string'
+            ? record.data
+            : JSON.stringify(record.data ?? '');
+        record.data = `${data}\n${note}`;
+      }
+      return typeof result === 'string' ? JSON.stringify(record) : record;
+    }
+    return result;
+  }
+
   private resultExitCode(result: unknown): number | undefined {
     if (!result || typeof result !== 'object') return undefined;
     const exitCode = (result as Record<string, unknown>).exitCode;
@@ -582,8 +655,7 @@ export class LongRunningAgentRuntime {
 
   private shouldCheckpoint(toolCall: ModelToolCall): boolean {
     if (toolCall.name === 'file_write') return true;
-    if (toolCall.name === 'zsh')
-      return typeof toolCall.args.comand === 'string';
+    if (toolCall.name === 'zsh') return commandOf(toolCall.args) !== undefined;
     if (toolCall.name !== 'git') return false;
     return /add|commit|checkout|reset|restore|clean|merge|rebase|apply/i.test(
       String(toolCall.args.gitCommand ?? ''),
@@ -624,4 +696,73 @@ export class LongRunningAgentRuntime {
       ]),
     );
   }
+}
+
+function oneLineText(value: unknown, max: number): string {
+  const text = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function resultText(result: unknown): string {
+  let value: unknown = result;
+  if (typeof result === 'string') {
+    try {
+      value = JSON.parse(result);
+    } catch {
+      return result;
+    }
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const field = record.errorMessage ?? record.data ?? '';
+    return typeof field === 'string' ? field : JSON.stringify(field);
+  }
+  return String(value ?? '');
+}
+
+/** A compact, specific description of a tool call and its outcome. */
+export function describeAction(
+  toolCall: ModelToolCall,
+  result: unknown,
+): string {
+  const args = toolCall.args;
+  const target =
+    commandOf(args) ??
+    (typeof args.fileName === 'string' ? args.fileName : undefined) ??
+    (typeof args.gitCommand === 'string'
+      ? `git ${args.gitCommand}`
+      : undefined) ??
+    (typeof args.query === 'string' ? args.query : undefined) ??
+    (typeof args.pattern === 'string' ? args.pattern : undefined) ??
+    '';
+  const base = `${toolCall.name} ${oneLineText(target, 140)}`.trim();
+  if (toolCall.name === 'create_a_subagent') {
+    return `${base} → ${oneLineText(resultText(result), 160)}`;
+  }
+  return base;
+}
+
+/**
+ * Append an action, collapsing repeats into a "(×N)" counter. The list is
+ * part of the mandatory task state, so it is kept within a character budget
+ * (oldest entries are dropped first).
+ */
+export function recordAction(
+  list: string[],
+  action: string,
+  maxChars = 2_000,
+): string[] {
+  let count = 1;
+  const rest = list.filter((entry) => {
+    const match = /^(.*) \(×(\d+)\)$/.exec(entry);
+    const base = match ? match[1] : entry;
+    if (base !== action) return true;
+    count += match ? Number(match[2]) : 1;
+    return false;
+  });
+  const next = [...rest, count > 1 ? `${action} (×${count})` : action];
+  while (next.length > 1 && next.join('').length > maxChars) next.shift();
+  return next;
 }

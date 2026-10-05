@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import readline from 'readline';
-import { getCurrentSession, PROVIDERS_TYPES } from '../utils/share';
+import { getCurrentSession } from '../utils/share';
 import { getAllToolsOfProviders } from '../utils/providersToolAdapter';
 import {
   bashTool,
@@ -12,6 +12,13 @@ import {
   WorkFlowStep,
 } from '../utils/toolsDefinition';
 import {
+  canonicalToolName,
+  isProviderError,
+  stringArg,
+  ToolArgumentError,
+  workflowStepsArg,
+} from '../utils/toolArgs';
+import {
   createHooks,
   addPreHook,
   addPostHook,
@@ -21,7 +28,7 @@ import {
   type HookContext,
 } from '../utils/lifecycleHooks';
 import {
-  intializeSubAgents,
+  initializeSubAgents,
   type SubagentExecutionOptions,
 } from '../utils/subagents';
 import {
@@ -66,13 +73,115 @@ async function askPermission(
   });
 }
 
-export async function dispatchTool(
+const KNOWN_TOOLS = [
+  'zsh',
+  'file_write',
+  'read_file',
+  'grep_search',
+  'find_files',
+  'git',
+  'create_a_subagent',
+  'plan_maker',
+  'skill_maker',
+  'tool_output_read',
+];
+
+async function executeToolCall(
   name: string,
+  args: Record<string, unknown>,
+  hooks: Hooks,
+  subagentOptions: SubagentExecutionOptions,
+  toolUi?: ToolUi,
+): Promise<unknown> {
+  if (name === 'zsh') {
+    return bashTool(stringArg(name, args, 'command'));
+  }
+  if (name === 'file_write') {
+    return writeFileTool(
+      stringArg(name, args, 'fileName'),
+      stringArg(name, args, 'content', { allowEmpty: true }),
+    );
+  }
+  if (name === 'read_file') {
+    return readFileTool(stringArg(name, args, 'fileName'));
+  }
+  if (name === 'grep_search') {
+    return grepSearchTool(
+      stringArg(name, args, 'pattern'),
+      stringArg(name, args, 'directory', { optional: true }) || process.cwd(),
+      stringArg(name, args, 'fileGlob', { optional: true }) || undefined,
+    );
+  }
+  if (name === 'find_files') {
+    return findFilesTool(
+      stringArg(name, args, 'directory', { optional: true }) || process.cwd(),
+      stringArg(name, args, 'namePattern'),
+    );
+  }
+  if (name === 'git') {
+    return gitTool(
+      stringArg(name, args, 'gitCommand'),
+      stringArg(name, args, 'repoPath', { optional: true }) || process.cwd(),
+    );
+  }
+  if (name === 'create_a_subagent') {
+    const basePrompt = stringArg(name, args, 'systemPrompt', {
+      optional: true,
+    });
+    const enrichedPrompt = generatedSkills
+      ? `## SKILLS & BEST PRACTICES\n${generatedSkills}\n\n---\n\n${basePrompt}`
+      : basePrompt;
+    return initializeSubAgents(
+      stringArg(name, args, 'query'),
+      enrichedPrompt,
+      hooks,
+      subagentOptions,
+    );
+  }
+  if (name === 'plan_maker') {
+    const steps = workflowStepsArg(args);
+    toolUi?.onNotice?.({
+      label: 'plan',
+      message: 'plan scheduled · handing work to the command queue',
+      tone: 'blue',
+    });
+    return toolScheduler(hooks, steps, subagentOptions, toolUi);
+  }
+  if (name === 'skill_maker') {
+    generatedSkills = typeof args.skills === 'string' ? args.skills : '';
+    toolUi?.onNotice?.({
+      label: 'skills',
+      message: 'guidance stored for the next subagent handoff',
+      tone: 'blue',
+    });
+    return { success: true, data: 'Skills stored.' };
+  }
+  if (name === 'tool_output_read' && subagentOptions.outputManager) {
+    return {
+      success: true,
+      data: await subagentOptions.outputManager.retrieve(
+        stringArg(name, args, 'outputId'),
+        {
+          start: typeof args.start === 'number' ? args.start : undefined,
+          end: typeof args.end === 'number' ? args.end : undefined,
+        },
+      ),
+    };
+  }
+  return {
+    success: false,
+    errorMessage: `Unknown tool: ${name}. Available tools: ${KNOWN_TOOLS.join(', ')}.`,
+  };
+}
+
+export async function dispatchTool(
+  requestedName: string,
   args: Record<string, unknown>,
   hooks: Hooks,
   subagentOptions: SubagentExecutionOptions = {},
   toolUi?: ToolUi,
 ): Promise<string> {
+  const name = canonicalToolName(requestedName);
   const context: HookContext = { tool: { name, args } };
   const decision = await firePreHooks(hooks, context);
   if (decision === 'deny') {
@@ -83,68 +192,18 @@ export async function dispatchTool(
   }
 
   let result: unknown;
-  if (name === 'zsh') {
-    result = await bashTool(args.comand as string);
-  } else if (name === 'file_write') {
-    result = await writeFileTool(
-      args.fileName as string,
-      args.content as string,
-    );
-  } else if (name === 'read_file') {
-    result = await readFileTool(args.fileName as string);
-  } else if (name === 'grep_search') {
-    result = await grepSearchTool(
-      args.pattern as string,
-      args.directory as string,
-      args.fileGlob as string | undefined,
-    );
-  } else if (name === 'find_files') {
-    result = await findFilesTool(
-      args.directory as string,
-      args.namePattern as string,
-    );
-  } else if (name === 'git') {
-    result = await gitTool(args.gitCommand as string, args.repoPath as string);
-  } else if (name === 'create_a_subagent') {
-    const basePrompt = args.systemPrompt as string;
-    const enrichedPrompt = generatedSkills
-      ? `## SKILLS & BEST PRACTICES\n${generatedSkills}\n\n---\n\n${basePrompt}`
-      : basePrompt;
-    result = await intializeSubAgents(
-      args.provider as PROVIDERS_TYPES,
-      args.query as string,
-      enrichedPrompt,
-      hooks,
-      subagentOptions,
-    );
-  } else if (name === 'plan_maker') {
-    toolUi?.onNotice?.({
-      label: 'plan',
-      message: 'plan scheduled · handing work to the command queue',
-      tone: 'blue',
-    });
-    result = await toolSchedular(hooks, args.steps as WorkFlowStep[], toolUi);
-  } else if (name === 'skill_maker') {
-    generatedSkills = (args.skills as string) ?? '';
-    toolUi?.onNotice?.({
-      label: 'skills',
-      message: 'guidance stored for the next subagent handoff',
-      tone: 'blue',
-    });
-    result = { success: true, data: 'Skills stored.' };
-  } else if (name === 'tool_output_read' && subagentOptions.outputManager) {
+  try {
+    result = await executeToolCall(name, args, hooks, subagentOptions, toolUi);
+  } catch (error) {
+    if (isProviderError(error)) throw error;
+    // A bad tool call is feedback for the model, never a reason to abort the run.
     result = {
-      success: true,
-      data: await subagentOptions.outputManager.retrieve(
-        args.outputId as string,
-        {
-          start: typeof args.start === 'number' ? args.start : undefined,
-          end: typeof args.end === 'number' ? args.end : undefined,
-        },
-      ),
+      success: false,
+      errorMessage:
+        error instanceof ToolArgumentError
+          ? error.message
+          : `${name} failed: ${error instanceof Error ? error.message : String(error)}`,
     };
-  } else {
-    result = { success: false, errorMessage: `Unknown tool: ${name}` };
   }
 
   context.result = result;
@@ -152,9 +211,10 @@ export async function dispatchTool(
   return JSON.stringify(result);
 }
 
-async function toolSchedular(
+async function toolScheduler(
   hooks: Hooks,
   workFlowSteps: WorkFlowStep[],
+  options: SubagentExecutionOptions,
   toolUi?: ToolUi,
 ): Promise<unknown[]> {
   const toolResults: unknown[] = [];
@@ -203,7 +263,7 @@ async function toolSchedular(
       tool.toolName,
       tool.args,
       hooks,
-      {},
+      options,
       toolUi,
     );
     completedSet.add(tool.toolId);
@@ -278,8 +338,14 @@ function buildHooks(toolUi?: ToolUi): Hooks {
   addPreHook(hooks, async ({ tool }) => {
     toolUi?.onToolStarted({ name: tool.name, args: tool.args });
     if (tool.name !== 'zsh') return 'allow';
+    // RELAY_AUTO_APPROVE=1 is for unattended runs (CI, sandboxed benchmarks)
+    // where nobody can answer the prompt.
+    const command = stringArg(tool.name, tool.args, 'command', {
+      optional: true,
+    });
     const allowed =
-      !(tool.args.comand as string).includes('rm') ||
+      !command.includes('rm') ||
+      process.env.RELAY_AUTO_APPROVE === '1' ||
       (await askPermission(tool.name, tool.args, toolUi));
     if (!allowed) {
       toolUi?.onToolFinished({
@@ -302,7 +368,7 @@ function buildHooks(toolUi?: ToolUi): Hooks {
       !ok && res?.errorMessage ? ` - Error: ${res.errorMessage}` : '';
     const details =
       tool.name === 'zsh'
-        ? ` [command: "${tool.args.comand}"]`
+        ? ` [command: "${stringArg(tool.name, tool.args, 'command', { optional: true })}"]`
         : tool.name === 'file_write' || tool.name === 'read_file'
           ? ` [file: ${tool.args.fileName}]`
           : tool.name === 'grep_search'
@@ -321,22 +387,21 @@ function buildHooks(toolUi?: ToolUi): Hooks {
 
 const SYSTEM_PROMPT = `
 You are the Lead Coordinator Agent.
-Your role is to understand the user's request, generate best-practice skills, and delegate all work to subagents.
+Your role is to understand the user's request, delegate the hands-on work to subagents, and make sure the request is fully and correctly completed.
 
 The runtime persists durable task state and observable execution events in SQLite. Treat the filesystem as current world state and keep decisions, constraints, verification results, blockers, and next steps explicit. You may receive a reconstructed active context after compaction; do not assume earlier chat messages are present.
 
-MANDATORY — FOLLOW THIS ORDER:
-1. Call 'skill_maker' FIRST. Write comprehensive best-practice guidance for the topic as the 'skills' argument (you write the content yourself). This will automatically be injected into every subagent you spawn.
-2. Use 'read_file' if you need context from the project.
-3. Delegate all actual work (file writes, shell commands, installs) using 'create_a_subagent'.
-4. Do NOT write files or run commands yourself.
+HOW TO WORK:
+1. Delegate work with 'create_a_subagent'. Subagents run commands and edit files; you do not.
+   - The 'query' must be self-contained: include the user's request VERBATIM, every exact path, filename, format and constraint, plus anything you already learned. Subagents cannot see this conversation.
+   - Prefer ONE subagent for a sequential task so it keeps its working context. Split work only into genuinely independent parts.
+2. Use 'read_file' to check results yourself when that is quick.
+3. Verify before finishing: when a subagent reports completion, check every requirement of the original request against the actual files/outputs (read them, or delegate a verification subagent that runs the checks). If anything is missing or wrong, delegate a fix with the concrete problem described.
+4. 'skill_maker' is optional; use it only when domain guidance would clearly help several subagents.
+5. Do not ask subagents to create git commits or branches unless the user asked for that.
+6. Give your final answer (with no tool call) only when the request is complete and verified, summarizing what was done.
 
-Subagents have access to: zsh, file_write, read_file, tool_output_read, grep_search, find_files, git, plan_maker.
-
-Guidelines:
-- Divide complex tasks into clear sub-tasks, each handled by a separate sub-agent.
-- Instruct subagents to use grep_search/find_files before writing code.
-- Instruct subagents to commit with git after finishing.
+Subagents have access to: zsh (a bash shell), file_write, read_file, tool_output_read, grep_search, find_files, git, plan_maker.
 `;
 
 export interface AgentCommandOptions {
@@ -402,13 +467,11 @@ export async function runAgent(
           name,
           args,
           hooks,
-          name === 'create_a_subagent'
-            ? {
-                outputManager: runtimeBundle!.toolOutputManager,
-                taskId: metadata.taskId,
-                runId: metadata.runId,
-              }
-            : {},
+          {
+            outputManager: runtimeBundle!.toolOutputManager,
+            taskId: metadata.taskId,
+            runId: metadata.runId,
+          },
           dashboard,
         );
       },
@@ -432,6 +495,7 @@ export async function runAgent(
       adapter,
       maxIterations: Number(options.maxIterations ?? 500),
       verifyOnFinish: Boolean(options.verify),
+      minToolCallsBeforeFinish: 1,
     });
     const metrics = runtimeBundle.eventStore.metrics(result.taskId);
     dashboard.onNotice({

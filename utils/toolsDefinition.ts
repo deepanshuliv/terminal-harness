@@ -1,4 +1,5 @@
 import { exec } from 'child_process';
+import { existsSync } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 import { promisify } from 'util';
@@ -11,15 +12,57 @@ export type toolReturnType =
   | { success: true; data: unknown }
   | { success: false; errorMessage: string };
 
+const DEFAULT_COMMAND_TIMEOUT_MS = 180_000;
+const MAX_COMMAND_OUTPUT_BYTES = 20 * 1024 * 1024;
+
+function commandTimeoutMs(): number {
+  const configured = Number(process.env.RELAY_COMMAND_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_COMMAND_TIMEOUT_MS;
+}
+
+// Prefer bash (most scripts and model-written commands assume it) and fall
+// back to the platform default shell when bash is unavailable.
+const preferredShell = ['/bin/bash', '/usr/bin/bash'].find((candidate) =>
+  existsSync(candidate),
+);
+
 export async function bashTool(command: string): Promise<toolReturnType> {
+  const timeout = commandTimeoutMs();
   try {
-    const { stdout, stderr } = await execAsync(command, { timeout: 30000 });
+    const { stdout, stderr } = await execAsync(command, {
+      timeout,
+      maxBuffer: MAX_COMMAND_OUTPUT_BYTES,
+      // Unattended execution: never block on pagers, editors or prompts.
+      env: {
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        GIT_TERMINAL_PROMPT: '0',
+        DEBIAN_FRONTEND: 'noninteractive',
+        ...process.env,
+      },
+      ...(preferredShell ? { shell: preferredShell } : {}),
+    });
     const output = (stdout || '') + (stderr ? `\n[stderr]: ${stderr}` : '');
     return { success: true, data: output || '(no output)' };
   } catch (error: any) {
+    // Non-zero exits are normal feedback: return exit code, stdout and stderr
+    // so the model can see what actually happened.
+    const timedOut = error?.killed && error?.signal === 'SIGTERM';
+    const parts = [
+      timedOut
+        ? `Command timed out after ${timeout / 1000}s and was killed. Run long jobs in the background (nohup ... &) and poll.`
+        : `Command exited with code ${error?.code ?? 'unknown'}${error?.signal ? ` (signal ${error.signal})` : ''}.`,
+      error?.stdout ? `[stdout]:\n${error.stdout}` : '',
+      error?.stderr ? `[stderr]:\n${error.stderr}` : '',
+    ].filter(Boolean);
     return {
       success: false,
-      errorMessage: error?.message ?? 'Command failed to execute',
+      errorMessage:
+        parts.length > 1
+          ? parts.join('\n')
+          : `${parts[0]}\n${error?.message ?? 'Command failed to execute'}`,
     };
   }
 }
@@ -42,8 +85,11 @@ export async function writeFileTool(
     }
 
     return { success: true, data: `File written: ${filePath}` };
-  } catch {
-    return { success: false, errorMessage: "can't able to write data" };
+  } catch (error) {
+    return {
+      success: false,
+      errorMessage: `can't write ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
@@ -51,8 +97,11 @@ export async function readFileTool(filePath: string): Promise<toolReturnType> {
   try {
     const data = await fs.readFile(filePath, 'utf-8');
     return { success: true, data };
-  } catch {
-    return { success: false, errorMessage: "can't able to read data" };
+  } catch (error) {
+    return {
+      success: false,
+      errorMessage: `can't read ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
@@ -102,21 +151,7 @@ export async function gitTool(
   gitCommand: string,
   repoPath: string,
 ): Promise<toolReturnType> {
-  try {
-    const { stdout, stderr } = await execAsync(
-      `git -C "${repoPath}" ${gitCommand}`,
-      {
-        timeout: 15000,
-      },
-    );
-    const output = (stdout || '') + (stderr ? `\n[stderr]: ${stderr}` : '');
-    return { success: true, data: output || '(no output)' };
-  } catch (error: any) {
-    return {
-      success: false,
-      errorMessage: error?.message ?? 'git command failed',
-    };
-  }
+  return bashTool(`git -C ${JSON.stringify(repoPath || '.')} ${gitCommand}`);
 }
 
 export interface WorkFlowStep {

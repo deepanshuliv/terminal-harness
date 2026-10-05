@@ -4,7 +4,7 @@ import { ALL_TOOLS, Ttool } from './tools';
 function convertToGeminiTool(tool: Ttool) {
   return {
     name: tool.name,
-    description: tool.descripiton,
+    description: tool.description,
     parametersJsonSchema: tool.options,
   };
 }
@@ -12,7 +12,7 @@ function convertToGeminiTool(tool: Ttool) {
 function convertToAnthropicTool(tool: Ttool) {
   return {
     name: tool.name,
-    description: tool.descripiton,
+    description: tool.description,
     input_schema: tool.options,
   };
 }
@@ -22,7 +22,7 @@ function convertToOpenAiTool(tool: Ttool) {
     type: 'function',
     function: {
       name: tool.name,
-      description: tool.descripiton,
+      description: tool.description,
       parameters: tool.options,
     },
   };

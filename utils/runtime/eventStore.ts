@@ -225,6 +225,34 @@ export class EventStore {
     return rows.map((row) => this.toEvent(row));
   }
 
+  /**
+   * Most recent finished tool calls, newest first, each paired with the
+   * arguments from its tool_requested event.
+   */
+  listRecentToolResults(
+    taskId: string,
+    limit = 8,
+  ): Array<{ finished: ExecutionEvent; requested?: ExecutionEvent }> {
+    const finished = (
+      this.db
+        .query(
+          `SELECT * FROM events WHERE task_id = $taskId AND type = 'tool_finished' ORDER BY id DESC LIMIT ${Math.max(1, Math.min(limit, 50))}`,
+        )
+        .all({ $taskId: taskId }) as EventRow[]
+    ).map((row) => this.toEvent(row));
+    return finished.map((event) => {
+      const row = event.parentEventId
+        ? (this.db
+            .query('SELECT * FROM events WHERE id = $id')
+            .get({ $id: event.parentEventId }) as EventRow | null)
+        : null;
+      return {
+        finished: event,
+        requested: row ? this.toEvent(row) : undefined,
+      };
+    });
+  }
+
   count(taskId?: string): number {
     const row = taskId
       ? (this.db

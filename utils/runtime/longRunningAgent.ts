@@ -276,10 +276,7 @@ export class LongRunningAgentRuntime {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failed = this.deps.taskStateManager.markFailed(
-        task.taskId,
-        message,
-      );
+      this.deps.taskStateManager.markFailed(task.taskId, message);
       this.deps.eventStore.append({
         type: 'agent_failed',
         sessionId: task.sessionId,

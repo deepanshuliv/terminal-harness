@@ -42,7 +42,7 @@ export async function writeFileTool(
     }
 
     return { success: true, data: `File written: ${filePath}` };
-  } catch (error) {
+  } catch {
     return { success: false, errorMessage: "can't able to write data" };
   }
 }
@@ -51,7 +51,7 @@ export async function readFileTool(filePath: string): Promise<toolReturnType> {
   try {
     const data = await fs.readFile(filePath, 'utf-8');
     return { success: true, data };
-  } catch (error) {
+  } catch {
     return { success: false, errorMessage: "can't able to read data" };
   }
 }
@@ -69,7 +69,7 @@ export async function grepSearchTool(
       success: true,
       data: stdout || `No matches found for "${pattern}" in ${directory}`,
     };
-  } catch (error: any) {
+  } catch {
     return {
       success: true,
       data: `No matches found for "${pattern}" in ${directory}`,

@@ -41,7 +41,6 @@ type QueueItem = {
   toolId: string;
   toolName: string;
   args: Record<string, unknown>;
-  status: 'pending' | 'completed';
 };
 
 async function askPermission(
@@ -192,7 +191,6 @@ async function toolSchedular(
       toolId: step.id,
       toolName: step.toolName,
       args: step.args,
-      status: 'pending',
     };
     if (step.dependsOn.length === 0) readyQueue.push(item);
     else waitingQueue.push(item);

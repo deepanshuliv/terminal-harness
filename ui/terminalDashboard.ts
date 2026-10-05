@@ -146,7 +146,6 @@ export class TerminalDashboard implements RuntimeObserver, ToolUi {
   private readonly output: NodeJS.WriteStream;
   private startedAt = Date.now();
   private objective = '';
-  private taskId = '';
   private statusText = '';
   private failureShown = false;
   private readonly activeTools = new Map<string, number[]>();
@@ -168,7 +167,6 @@ export class TerminalDashboard implements RuntimeObserver, ToolUi {
     model: string;
   }): void {
     this.startedAt = Date.now();
-    this.taskId = notice.taskId;
     this.print('');
     this.print(
       `${paint('Relay', 'ember', this.color)}  ${paint(`/ ${shortId(notice.taskId)}`, 'paper', this.color)}  ${paint('Ink & Ember', 'dim', this.color)}`,

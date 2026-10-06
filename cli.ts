@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { program } from 'commander';
 import { agentCommand } from './commands/agent';
 import { providerCommand } from './commands/providers';

@@ -2,6 +2,9 @@
   "name": "relay",
   "version": "0.2.0",
   "description": "A durable terminal coding workspace",
+  "bin": {
+    "relay": "./cli.ts"
+  },
   "scripts": {
     "format": "prettier --write \"**/*.{ts,tsx,js,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json}\"",

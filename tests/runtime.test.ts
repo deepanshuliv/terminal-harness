@@ -632,5 +632,5 @@ describe('long-running integration and restart', () => {
     ).toBe('completed');
     reopened.close();
     fs.rmSync(root, { recursive: true, force: true });
-  });
+  }, 30_000); // 120 iterations; measured ~10s on GitHub-hosted Linux runners
 });

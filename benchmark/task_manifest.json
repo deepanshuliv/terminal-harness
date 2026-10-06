@@ -1,0 +1,20 @@
+{
+  "dataset": "terminal-bench@2.0",
+  "dataset_git_url": "https://github.com/laude-institute/terminal-bench-2.git",
+  "dataset_git_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+  "selection": "'tasks' (dev set): smoke task fix-git plus 4 easy/medium tasks with small amd64 images, 900s agent timeouts and offline verifiers. Relay improvements were developed against failures observed on this set. 'heldout_tasks': 5 further easy/medium tasks fixed BEFORE any held-out run and never used for tuning; they measure whether improvements generalize. Neither set is a random sample.",
+  "tasks": [
+    "fix-git",
+    "openssl-selfsigned-cert",
+    "log-summary-date-ranges",
+    "regex-log",
+    "git-leak-recovery"
+  ],
+  "heldout_tasks": [
+    "sqlite-db-truncate",
+    "multi-source-data-merger",
+    "sanitize-git-repo",
+    "vulnerable-secret",
+    "cobol-modernization"
+  ]
+}

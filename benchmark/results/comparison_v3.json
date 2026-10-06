@@ -1,0 +1,770 @@
+{
+  "dataset": "terminal-bench@2.0",
+  "model": "openrouter/poolside/laguna-s-2.1:free",
+  "task_set": "tasks",
+  "relay_version_filter": "0.2.0+afb40ab687f9.341eff40",
+  "manifest_tasks": [
+    "fix-git",
+    "openssl-selfsigned-cert",
+    "log-summary-date-ranges",
+    "regex-log",
+    "git-leak-recovery"
+  ],
+  "paired_valid_tasks": [
+    "fix-git",
+    "openssl-selfsigned-cert",
+    "log-summary-date-ranges"
+  ],
+  "model_identity_verified": true,
+  "task_checksums_match": true,
+  "summary_paired": {
+    "my-harness": {
+      "trials": 3,
+      "valid_trials": 3,
+      "passed": 2,
+      "success_rate": 0.667,
+      "input_tokens": 778823,
+      "output_tokens": 87457,
+      "total_tokens": 866280,
+      "model_requests": 88,
+      "tool_calls": 135,
+      "agent_exec_sec": 1876.3000000000002,
+      "cost_usd": 0.0,
+      "timeouts": 0,
+      "infra_errors": 0,
+      "incomplete": 0,
+      "rate_limited_requests": 5
+    },
+    "mini-swe-agent": {
+      "trials": 3,
+      "valid_trials": 3,
+      "passed": 3,
+      "success_rate": 1.0,
+      "input_tokens": 209840,
+      "output_tokens": 12423,
+      "total_tokens": 222263,
+      "model_requests": 32,
+      "tool_calls": 45,
+      "agent_exec_sec": 497.09999999999997,
+      "cost_usd": 0.0,
+      "timeouts": 0,
+      "infra_errors": 0,
+      "incomplete": 0,
+      "rate_limited_requests": null
+    }
+  },
+  "per_task": {
+    "fix-git": {
+      "my-harness": {
+        "agent": "my-harness",
+        "task": "fix-git",
+        "trial": "fix-git__vSma9mm",
+        "job": "relay__fix-git__20261003T064732Z",
+        "task_checksum": "7fa0a681f751d73f290d862522a82a5e448fa529834987ee1b80e5665c51aa7e",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "0.2.0+afb40ab687f9.341eff40",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "pass",
+        "valid": true,
+        "reward": 1.0,
+        "exception": null,
+        "agent_exec_sec": 651.0,
+        "trial_total_sec": 668.2,
+        "input_tokens": 341197,
+        "output_tokens": 30171,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 37,
+        "failed_requests": 1,
+        "rate_limited_requests": 1,
+        "tool_calls": 75,
+        "tool_calls_by_name": {
+          "create_a_subagent": 3,
+          "git": 67,
+          "read": 3,
+          "read_file": 2
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "agent_exit": null,
+        "verifier_output": "benchmark/results/my-harness/jobs/relay__fix-git__20261003T064732Z/fix-git__vSma9mm/verifier/test-stdout.txt"
+      },
+      "mini-swe-agent": {
+        "agent": "mini-swe-agent",
+        "task": "fix-git",
+        "trial": "fix-git__gWHVMFp",
+        "job": "mini-swe-agent__fix-git__20261003T025114Z",
+        "task_checksum": "7fa0a681f751d73f290d862522a82a5e448fa529834987ee1b80e5665c51aa7e",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "2.4.6",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "pass",
+        "valid": true,
+        "reward": 1.0,
+        "exception": null,
+        "agent_exec_sec": 131.1,
+        "trial_total_sec": 200.5,
+        "input_tokens": 99746,
+        "output_tokens": 4898,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 13,
+        "failed_requests": null,
+        "rate_limited_requests": null,
+        "tool_calls": 26,
+        "tool_calls_by_name": {
+          "bash": 26
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": null,
+        "agent_exit": "Submitted",
+        "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__fix-git__20261003T025114Z/fix-git__gWHVMFp/verifier/test-stdout.txt"
+      }
+    },
+    "openssl-selfsigned-cert": {
+      "my-harness": {
+        "agent": "my-harness",
+        "task": "openssl-selfsigned-cert",
+        "trial": "openssl-selfsigned-cert__hDTnuSh",
+        "job": "relay__openssl-selfsigned-cert__20261003T065845Z",
+        "task_checksum": "8c096d8af92f88d8f876e26efc7f495ff13f50586736e56f35140fbb080ff390",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "0.2.0+afb40ab687f9.341eff40",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "fail",
+        "valid": true,
+        "reward": 0.0,
+        "exception": null,
+        "agent_exec_sec": 468.1,
+        "trial_total_sec": 485.6,
+        "input_tokens": 131357,
+        "output_tokens": 21575,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 25,
+        "failed_requests": 3,
+        "rate_limited_requests": 3,
+        "tool_calls": 26,
+        "tool_calls_by_name": {
+          "plan_maker": 4,
+          "create_a_subagent": 2,
+          "zsh": 15,
+          "read_file": 4,
+          "file_write": 1
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "agent_exit": null,
+        "verifier_output": "benchmark/results/my-harness/jobs/relay__openssl-selfsigned-cert__20261003T065845Z/openssl-selfsigned-cert__hDTnuSh/verifier/test-stdout.txt"
+      },
+      "mini-swe-agent": {
+        "agent": "mini-swe-agent",
+        "task": "openssl-selfsigned-cert",
+        "trial": "openssl-selfsigned-cert__7AJh9Gv",
+        "job": "mini-swe-agent__openssl-selfsigned-cert__20261003T030750Z",
+        "task_checksum": "8c096d8af92f88d8f876e26efc7f495ff13f50586736e56f35140fbb080ff390",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "2.4.6",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "pass",
+        "valid": true,
+        "reward": 1.0,
+        "exception": null,
+        "agent_exec_sec": 87.6,
+        "trial_total_sec": 171.4,
+        "input_tokens": 32493,
+        "output_tokens": 2495,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 11,
+        "failed_requests": null,
+        "rate_limited_requests": null,
+        "tool_calls": 11,
+        "tool_calls_by_name": {
+          "bash": 11
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": null,
+        "agent_exit": "Submitted",
+        "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__openssl-selfsigned-cert__20261003T030750Z/openssl-selfsigned-cert__7AJh9Gv/verifier/test-stdout.txt"
+      }
+    },
+    "log-summary-date-ranges": {
+      "my-harness": {
+        "agent": "my-harness",
+        "task": "log-summary-date-ranges",
+        "trial": "log-summary-date-ranges__VyFqTtM",
+        "job": "relay__log-summary-date-ranges__20261003T070655Z",
+        "task_checksum": "fe600befce59ff43dd85cb1db864652d4e6fa4706c6dd8a1d82118c1a76561ae",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "0.2.0+afb40ab687f9.341eff40",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "pass",
+        "valid": true,
+        "reward": 1.0,
+        "exception": null,
+        "agent_exec_sec": 757.2,
+        "trial_total_sec": 774.9,
+        "input_tokens": 306269,
+        "output_tokens": 35711,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 26,
+        "failed_requests": 1,
+        "rate_limited_requests": 1,
+        "tool_calls": 34,
+        "tool_calls_by_name": {
+          "read_file": 9,
+          "shell": 18,
+          "create_a_subagent": 2,
+          "zsh": 3,
+          "file_write": 2
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "agent_exit": null,
+        "verifier_output": "benchmark/results/my-harness/jobs/relay__log-summary-date-ranges__20261003T070655Z/log-summary-date-ranges__VyFqTtM/verifier/test-stdout.txt"
+      },
+      "mini-swe-agent": {
+        "agent": "mini-swe-agent",
+        "task": "log-summary-date-ranges",
+        "trial": "log-summary-date-ranges__QfGSVMk",
+        "job": "mini-swe-agent__log-summary-date-ranges__20261003T031335Z",
+        "task_checksum": "fe600befce59ff43dd85cb1db864652d4e6fa4706c6dd8a1d82118c1a76561ae",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "2.4.6",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "pass",
+        "valid": true,
+        "reward": 1.0,
+        "exception": null,
+        "agent_exec_sec": 278.4,
+        "trial_total_sec": 365.0,
+        "input_tokens": 77601,
+        "output_tokens": 5030,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 8,
+        "failed_requests": null,
+        "rate_limited_requests": null,
+        "tool_calls": 8,
+        "tool_calls_by_name": {
+          "bash": 8
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": null,
+        "agent_exit": "Submitted",
+        "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__log-summary-date-ranges__20261003T031335Z/log-summary-date-ranges__QfGSVMk/verifier/test-stdout.txt"
+      }
+    },
+    "regex-log": {
+      "my-harness": {
+        "agent": "my-harness",
+        "task": "regex-log",
+        "trial": "regex-log__32sjGhx",
+        "job": "relay__regex-log__20261003T071955Z",
+        "task_checksum": "21c195b5984842dcef348132035504459514fc9ba31d1d813a82e59aa784dcc9",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "0.2.0+afb40ab687f9.341eff40",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "incomplete",
+        "valid": false,
+        "reward": null,
+        "exception": "NonZeroAgentExitCodeError",
+        "agent_exec_sec": 617.6,
+        "trial_total_sec": 622.4,
+        "input_tokens": 7986,
+        "output_tokens": 32768,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 4,
+        "failed_requests": 0,
+        "rate_limited_requests": 0,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "agent_exit": null,
+        "verifier_output": "benchmark/results/my-harness/jobs/relay__regex-log__20261003T071955Z/regex-log__32sjGhx/verifier/test-stdout.txt"
+      },
+      "mini-swe-agent": {
+        "agent": "mini-swe-agent",
+        "task": "regex-log",
+        "trial": "regex-log__VogM9CE",
+        "job": "mini-swe-agent__regex-log__20261003T032136Z",
+        "task_checksum": "21c195b5984842dcef348132035504459514fc9ba31d1d813a82e59aa784dcc9",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "2.4.6",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "fail",
+        "valid": true,
+        "reward": 0.0,
+        "exception": "AgentTimeoutError",
+        "agent_exec_sec": 900.0,
+        "trial_total_sec": 1123.4,
+        "input_tokens": 1072,
+        "output_tokens": 32768,
+        "cost_usd": 0.0,
+        "timed_out": true,
+        "model_requests": 1,
+        "failed_requests": null,
+        "rate_limited_requests": null,
+        "tool_calls": 0,
+        "tool_calls_by_name": {},
+        "response_models": null,
+        "requested_models": null,
+        "agent_exit": "",
+        "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__regex-log__20261003T032136Z/regex-log__VogM9CE/verifier/test-stdout.txt"
+      }
+    },
+    "git-leak-recovery": {
+      "my-harness": {
+        "agent": "my-harness",
+        "task": "git-leak-recovery",
+        "trial": "git-leak-recovery__yyXrRM8",
+        "job": "relay__git-leak-recovery__20261003T073023Z",
+        "task_checksum": "6e313b191485295fc042ddfdc4d1184dc9588de1fa57f7513685fec67a7d7d9d",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "0.2.0+afb40ab687f9.341eff40",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "infra_error",
+        "valid": false,
+        "reward": 1.0,
+        "exception": "ApiRateLimitError",
+        "agent_exec_sec": 585.2,
+        "trial_total_sec": 611.4,
+        "input_tokens": 102395,
+        "output_tokens": 32246,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 24,
+        "failed_requests": 6,
+        "rate_limited_requests": 6,
+        "tool_calls": 32,
+        "tool_calls_by_name": {
+          "create_a_subagent": 3,
+          "plan_maker": 2,
+          "git": 6,
+          "read_file": 2,
+          "shell": 2,
+          "zsh": 17
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "agent_exit": null,
+        "verifier_output": "benchmark/results/my-harness/jobs/relay__git-leak-recovery__20261003T073023Z/git-leak-recovery__yyXrRM8/verifier/test-stdout.txt"
+      },
+      "mini-swe-agent": {
+        "agent": "mini-swe-agent",
+        "task": "git-leak-recovery",
+        "trial": "git-leak-recovery__QCPcgXu",
+        "job": "mini-swe-agent__git-leak-recovery__20261003T035108Z",
+        "task_checksum": "6e313b191485295fc042ddfdc4d1184dc9588de1fa57f7513685fec67a7d7d9d",
+        "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+        "agent_version": "2.4.6",
+        "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+        "status": "pass",
+        "valid": true,
+        "reward": 1.0,
+        "exception": null,
+        "agent_exec_sec": 142.0,
+        "trial_total_sec": 264.8,
+        "input_tokens": 81064,
+        "output_tokens": 5128,
+        "cost_usd": 0.0,
+        "timed_out": false,
+        "model_requests": 13,
+        "failed_requests": null,
+        "rate_limited_requests": null,
+        "tool_calls": 13,
+        "tool_calls_by_name": {
+          "bash": 13
+        },
+        "response_models": [
+          "poolside/laguna-s-2.1:free"
+        ],
+        "requested_models": null,
+        "agent_exit": "Submitted",
+        "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__git-leak-recovery__20261003T035108Z/git-leak-recovery__QCPcgXu/verifier/test-stdout.txt"
+      }
+    }
+  },
+  "all_trials": [
+    {
+      "agent": "my-harness",
+      "task": "fix-git",
+      "trial": "fix-git__vSma9mm",
+      "job": "relay__fix-git__20261003T064732Z",
+      "task_checksum": "7fa0a681f751d73f290d862522a82a5e448fa529834987ee1b80e5665c51aa7e",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "0.2.0+afb40ab687f9.341eff40",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "pass",
+      "valid": true,
+      "reward": 1.0,
+      "exception": null,
+      "agent_exec_sec": 651.0,
+      "trial_total_sec": 668.2,
+      "input_tokens": 341197,
+      "output_tokens": 30171,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 37,
+      "failed_requests": 1,
+      "rate_limited_requests": 1,
+      "tool_calls": 75,
+      "tool_calls_by_name": {
+        "create_a_subagent": 3,
+        "git": 67,
+        "read": 3,
+        "read_file": 2
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "agent_exit": null,
+      "verifier_output": "benchmark/results/my-harness/jobs/relay__fix-git__20261003T064732Z/fix-git__vSma9mm/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "my-harness",
+      "task": "git-leak-recovery",
+      "trial": "git-leak-recovery__yyXrRM8",
+      "job": "relay__git-leak-recovery__20261003T073023Z",
+      "task_checksum": "6e313b191485295fc042ddfdc4d1184dc9588de1fa57f7513685fec67a7d7d9d",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "0.2.0+afb40ab687f9.341eff40",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "infra_error",
+      "valid": false,
+      "reward": 1.0,
+      "exception": "ApiRateLimitError",
+      "agent_exec_sec": 585.2,
+      "trial_total_sec": 611.4,
+      "input_tokens": 102395,
+      "output_tokens": 32246,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 24,
+      "failed_requests": 6,
+      "rate_limited_requests": 6,
+      "tool_calls": 32,
+      "tool_calls_by_name": {
+        "create_a_subagent": 3,
+        "plan_maker": 2,
+        "git": 6,
+        "read_file": 2,
+        "shell": 2,
+        "zsh": 17
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "agent_exit": null,
+      "verifier_output": "benchmark/results/my-harness/jobs/relay__git-leak-recovery__20261003T073023Z/git-leak-recovery__yyXrRM8/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "my-harness",
+      "task": "log-summary-date-ranges",
+      "trial": "log-summary-date-ranges__VyFqTtM",
+      "job": "relay__log-summary-date-ranges__20261003T070655Z",
+      "task_checksum": "fe600befce59ff43dd85cb1db864652d4e6fa4706c6dd8a1d82118c1a76561ae",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "0.2.0+afb40ab687f9.341eff40",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "pass",
+      "valid": true,
+      "reward": 1.0,
+      "exception": null,
+      "agent_exec_sec": 757.2,
+      "trial_total_sec": 774.9,
+      "input_tokens": 306269,
+      "output_tokens": 35711,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 26,
+      "failed_requests": 1,
+      "rate_limited_requests": 1,
+      "tool_calls": 34,
+      "tool_calls_by_name": {
+        "read_file": 9,
+        "shell": 18,
+        "create_a_subagent": 2,
+        "zsh": 3,
+        "file_write": 2
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "agent_exit": null,
+      "verifier_output": "benchmark/results/my-harness/jobs/relay__log-summary-date-ranges__20261003T070655Z/log-summary-date-ranges__VyFqTtM/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "my-harness",
+      "task": "openssl-selfsigned-cert",
+      "trial": "openssl-selfsigned-cert__hDTnuSh",
+      "job": "relay__openssl-selfsigned-cert__20261003T065845Z",
+      "task_checksum": "8c096d8af92f88d8f876e26efc7f495ff13f50586736e56f35140fbb080ff390",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "0.2.0+afb40ab687f9.341eff40",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "fail",
+      "valid": true,
+      "reward": 0.0,
+      "exception": null,
+      "agent_exec_sec": 468.1,
+      "trial_total_sec": 485.6,
+      "input_tokens": 131357,
+      "output_tokens": 21575,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 25,
+      "failed_requests": 3,
+      "rate_limited_requests": 3,
+      "tool_calls": 26,
+      "tool_calls_by_name": {
+        "plan_maker": 4,
+        "create_a_subagent": 2,
+        "zsh": 15,
+        "read_file": 4,
+        "file_write": 1
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "agent_exit": null,
+      "verifier_output": "benchmark/results/my-harness/jobs/relay__openssl-selfsigned-cert__20261003T065845Z/openssl-selfsigned-cert__hDTnuSh/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "my-harness",
+      "task": "regex-log",
+      "trial": "regex-log__32sjGhx",
+      "job": "relay__regex-log__20261003T071955Z",
+      "task_checksum": "21c195b5984842dcef348132035504459514fc9ba31d1d813a82e59aa784dcc9",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "0.2.0+afb40ab687f9.341eff40",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "incomplete",
+      "valid": false,
+      "reward": null,
+      "exception": "NonZeroAgentExitCodeError",
+      "agent_exec_sec": 617.6,
+      "trial_total_sec": 622.4,
+      "input_tokens": 7986,
+      "output_tokens": 32768,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 4,
+      "failed_requests": 0,
+      "rate_limited_requests": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "agent_exit": null,
+      "verifier_output": "benchmark/results/my-harness/jobs/relay__regex-log__20261003T071955Z/regex-log__32sjGhx/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "mini-swe-agent",
+      "task": "fix-git",
+      "trial": "fix-git__gWHVMFp",
+      "job": "mini-swe-agent__fix-git__20261003T025114Z",
+      "task_checksum": "7fa0a681f751d73f290d862522a82a5e448fa529834987ee1b80e5665c51aa7e",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "2.4.6",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "pass",
+      "valid": true,
+      "reward": 1.0,
+      "exception": null,
+      "agent_exec_sec": 131.1,
+      "trial_total_sec": 200.5,
+      "input_tokens": 99746,
+      "output_tokens": 4898,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 13,
+      "failed_requests": null,
+      "rate_limited_requests": null,
+      "tool_calls": 26,
+      "tool_calls_by_name": {
+        "bash": 26
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": null,
+      "agent_exit": "Submitted",
+      "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__fix-git__20261003T025114Z/fix-git__gWHVMFp/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "mini-swe-agent",
+      "task": "git-leak-recovery",
+      "trial": "git-leak-recovery__QCPcgXu",
+      "job": "mini-swe-agent__git-leak-recovery__20261003T035108Z",
+      "task_checksum": "6e313b191485295fc042ddfdc4d1184dc9588de1fa57f7513685fec67a7d7d9d",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "2.4.6",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "pass",
+      "valid": true,
+      "reward": 1.0,
+      "exception": null,
+      "agent_exec_sec": 142.0,
+      "trial_total_sec": 264.8,
+      "input_tokens": 81064,
+      "output_tokens": 5128,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 13,
+      "failed_requests": null,
+      "rate_limited_requests": null,
+      "tool_calls": 13,
+      "tool_calls_by_name": {
+        "bash": 13
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": null,
+      "agent_exit": "Submitted",
+      "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__git-leak-recovery__20261003T035108Z/git-leak-recovery__QCPcgXu/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "mini-swe-agent",
+      "task": "log-summary-date-ranges",
+      "trial": "log-summary-date-ranges__QfGSVMk",
+      "job": "mini-swe-agent__log-summary-date-ranges__20261003T031335Z",
+      "task_checksum": "fe600befce59ff43dd85cb1db864652d4e6fa4706c6dd8a1d82118c1a76561ae",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "2.4.6",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "pass",
+      "valid": true,
+      "reward": 1.0,
+      "exception": null,
+      "agent_exec_sec": 278.4,
+      "trial_total_sec": 365.0,
+      "input_tokens": 77601,
+      "output_tokens": 5030,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 8,
+      "failed_requests": null,
+      "rate_limited_requests": null,
+      "tool_calls": 8,
+      "tool_calls_by_name": {
+        "bash": 8
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": null,
+      "agent_exit": "Submitted",
+      "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__log-summary-date-ranges__20261003T031335Z/log-summary-date-ranges__QfGSVMk/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "mini-swe-agent",
+      "task": "openssl-selfsigned-cert",
+      "trial": "openssl-selfsigned-cert__7AJh9Gv",
+      "job": "mini-swe-agent__openssl-selfsigned-cert__20261003T030750Z",
+      "task_checksum": "8c096d8af92f88d8f876e26efc7f495ff13f50586736e56f35140fbb080ff390",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "2.4.6",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "pass",
+      "valid": true,
+      "reward": 1.0,
+      "exception": null,
+      "agent_exec_sec": 87.6,
+      "trial_total_sec": 171.4,
+      "input_tokens": 32493,
+      "output_tokens": 2495,
+      "cost_usd": 0.0,
+      "timed_out": false,
+      "model_requests": 11,
+      "failed_requests": null,
+      "rate_limited_requests": null,
+      "tool_calls": 11,
+      "tool_calls_by_name": {
+        "bash": 11
+      },
+      "response_models": [
+        "poolside/laguna-s-2.1:free"
+      ],
+      "requested_models": null,
+      "agent_exit": "Submitted",
+      "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__openssl-selfsigned-cert__20261003T030750Z/openssl-selfsigned-cert__7AJh9Gv/verifier/test-stdout.txt"
+    },
+    {
+      "agent": "mini-swe-agent",
+      "task": "regex-log",
+      "trial": "regex-log__VogM9CE",
+      "job": "mini-swe-agent__regex-log__20261003T032136Z",
+      "task_checksum": "21c195b5984842dcef348132035504459514fc9ba31d1d813a82e59aa784dcc9",
+      "dataset_commit": "69671fbaac6d67a7ef0dfec016cc38a64ef7a77c",
+      "agent_version": "2.4.6",
+      "configured_model": "openrouter/poolside/laguna-s-2.1:free",
+      "status": "fail",
+      "valid": true,
+      "reward": 0.0,
+      "exception": "AgentTimeoutError",
+      "agent_exec_sec": 900.0,
+      "trial_total_sec": 1123.4,
+      "input_tokens": 1072,
+      "output_tokens": 32768,
+      "cost_usd": 0.0,
+      "timed_out": true,
+      "model_requests": 1,
+      "failed_requests": null,
+      "rate_limited_requests": null,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "response_models": null,
+      "requested_models": null,
+      "agent_exit": "",
+      "verifier_output": "benchmark/results/mini-swe-agent/jobs/mini-swe-agent__regex-log__20261003T032136Z/regex-log__VogM9CE/verifier/test-stdout.txt"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Compiled Relay binaries and build metadata (regenerate with scripts/build_relay.sh).
+build/
+# Raw Harbor trial output stays local: it contains Terminal-Bench task content,
+# which the dataset asks never to appear in public corpora.
+results/*/jobs/
+__pycache__/
+.pytest_cache/

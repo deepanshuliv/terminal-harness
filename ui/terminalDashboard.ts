@@ -72,8 +72,8 @@ function contextPercent(utilization: number): string {
 
 function toolAction(name: string, args: Record<string, unknown>): string {
   switch (name) {
-    case 'zsh':
-      return `zsh  ${oneLine(args.command ?? args.comand, 120) || '(empty command)'}`;
+    case 'bash':
+      return `bash  ${oneLine(args.command ?? args.comand, 120) || '(empty command)'}`;
     case 'file_write': {
       const content = typeof args.content === 'string' ? args.content : '';
       return `write  ${oneLine(args.fileName, 92)} · ${compactNumber(content.length)} chars`;

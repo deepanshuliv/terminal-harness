@@ -62,7 +62,7 @@ describe('openrouter provider', () => {
       function: { name: string };
     }>;
     expect(tools.every((tool) => tool.type === 'function')).toBe(true);
-    expect(tools.map((tool) => tool.function.name)).toContain('zsh');
+    expect(tools.map((tool) => tool.function.name)).toContain('bash');
   });
 
   test('RELAY_STATE_DIR relocates runtime state', () => {

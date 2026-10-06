@@ -1,4 +1,4 @@
-import { commandOf, isProviderError } from '../toolArgs';
+import { canonicalToolName, commandOf, isProviderError } from '../toolArgs';
 import { ContextManager, type BuildContextInput } from './contextManager';
 import { CheckpointManager } from './checkpointManager';
 import { CompactionManager } from './compactionManager';
@@ -655,7 +655,8 @@ export class LongRunningAgentRuntime {
 
   private shouldCheckpoint(toolCall: ModelToolCall): boolean {
     if (toolCall.name === 'file_write') return true;
-    if (toolCall.name === 'zsh') return commandOf(toolCall.args) !== undefined;
+    if (canonicalToolName(toolCall.name) === 'bash')
+      return commandOf(toolCall.args) !== undefined;
     if (toolCall.name !== 'git') return false;
     return /add|commit|checkout|reset|restore|clean|merge|rebase|apply/i.test(
       String(toolCall.args.gitCommand ?? ''),

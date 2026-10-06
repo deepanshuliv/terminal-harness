@@ -45,6 +45,7 @@ export function stringArg(
 
 export function workflowStepsArg(
   args: Record<string, unknown>,
+  allowedTools?: ReadonlySet<string>,
 ): WorkFlowStep[] {
   let steps: unknown = args.steps;
   if (typeof steps === 'string') {
@@ -73,9 +74,15 @@ export function workflowStepsArg(
         `plan_maker: step ${index} is missing "toolName".`,
       );
     }
+    const toolName = canonicalToolName(step.toolName);
+    if (allowedTools && !allowedTools.has(toolName)) {
+      throw new ToolArgumentError(
+        `plan_maker: step ${index} uses "${step.toolName}", which this agent may not run. Allowed tools: ${[...allowedTools].join(', ')}.`,
+      );
+    }
     return {
       id: typeof step.id === 'string' && step.id ? step.id : `s${index + 1}`,
-      toolName: step.toolName,
+      toolName,
       args:
         step.args && typeof step.args === 'object'
           ? (step.args as Record<string, unknown>)
@@ -108,7 +115,7 @@ export function isProviderError(error: unknown): boolean {
   );
 }
 
-/** Shell command of a zsh tool call, whichever argument name the model used. */
+/** Shell command of a bash tool call, whichever argument name the model used. */
 export function commandOf(args: Record<string, unknown>): string | undefined {
   for (const key of ['command', 'comand', 'cmd', 'script']) {
     if (typeof args[key] === 'string') return args[key] as string;
@@ -118,12 +125,13 @@ export function commandOf(args: Record<string, unknown>): string | undefined {
 
 // Tool names models commonly use for Relay's tools.
 const TOOL_NAME_ALIASES: Record<string, string> = {
-  shell: 'zsh',
-  bash: 'zsh',
-  sh: 'zsh',
-  terminal: 'zsh',
-  run_command: 'zsh',
-  execute_command: 'zsh',
+  // `zsh` was the shell tool's name before it was renamed to `bash`.
+  zsh: 'bash',
+  shell: 'bash',
+  sh: 'bash',
+  terminal: 'bash',
+  run_command: 'bash',
+  execute_command: 'bash',
   read: 'read_file',
   cat: 'read_file',
   write: 'file_write',

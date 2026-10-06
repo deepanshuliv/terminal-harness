@@ -7,7 +7,8 @@ import { getCurrentSession, PROVIDERS_TYPES } from './share';
 import { Hooks } from './lifecycleHooks';
 import { toolReturnType } from './toolsDefinition';
 import { outputTokenLimit } from './outputLimits';
-import { commandOf } from './toolArgs';
+import { canonicalToolName, commandOf } from './toolArgs';
+import { COORDINATOR_ONLY_TOOLS, type AgentRole } from './toolRoles';
 import {
   SubagentConversation,
   isDoneResponse,
@@ -23,11 +24,9 @@ export interface SubagentExecutionOptions {
   outputManager?: ToolOutputManager;
   taskId?: string;
   runId?: string;
+  /** Which agent is dispatching; enforced by `dispatchTool`. */
+  role?: AgentRole;
 }
-
-// Subagents do the work; spawning further agents or rewriting shared skills
-// is reserved for the coordinator.
-const COORDINATOR_ONLY_TOOLS = new Set(['create_a_subagent', 'skill_maker']);
 
 class BoundedObservationLog {
   private readonly observations: string[] = [];
@@ -205,7 +204,11 @@ class IsolatedSubagentExecutor {
         );
         conversation.addToolResult(
           call.id,
-          await this.representResult(call.function.name, args, result),
+          await this.representResult(
+            canonicalToolName(call.function.name),
+            args,
+            result,
+          ),
         );
       }
     }
@@ -388,6 +391,6 @@ export async function initializeSubAgents(
     query,
     isolatedContext,
     hooks,
-    options,
+    { ...options, role: 'subagent' },
   ).run();
 }

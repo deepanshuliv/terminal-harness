@@ -16,8 +16,8 @@ export type ToolCall = {
   args: Record<string, unknown>;
 };
 
-const zshCommands: Ttool = {
-  name: 'zsh',
+const bashCommands: Ttool = {
+  name: 'bash',
   description:
     'Run a shell command (bash) in the workspace and return its exit code, stdout and stderr.',
   options: {
@@ -198,7 +198,7 @@ const planMaker: Ttool = {
             },
             toolName: {
               type: 'string',
-              description: 'Name of the tool to call (e.g. zsh, read_file)',
+              description: 'Name of the tool to call (e.g. bash, read_file)',
             },
             args: {
               type: 'object',
@@ -236,7 +236,7 @@ const skillsMaker: Ttool = {
 
 export const ALL_TOOLS: Ttool[] = [
   skillsMaker,
-  zshCommands,
+  bashCommands,
   WriteToFile,
   ReadToFile,
   ReadToolOutput,

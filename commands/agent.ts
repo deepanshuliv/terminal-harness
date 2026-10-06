@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import readline from 'readline';
 import { getCurrentSession } from '../utils/share';
+import { deletesFiles } from '../utils/commandSafety';
 import { getAllToolsOfProviders } from '../utils/providersToolAdapter';
 import {
   bashTool,
@@ -11,6 +12,11 @@ import {
   gitTool,
   WorkFlowStep,
 } from '../utils/toolsDefinition';
+import {
+  COORDINATOR_TOOLS,
+  PLAN_STEP_TOOLS,
+  roleViolation,
+} from '../utils/toolRoles';
 import {
   canonicalToolName,
   isProviderError,
@@ -74,7 +80,7 @@ async function askPermission(
 }
 
 const KNOWN_TOOLS = [
-  'zsh',
+  'bash',
   'file_write',
   'read_file',
   'grep_search',
@@ -93,7 +99,7 @@ async function executeToolCall(
   subagentOptions: SubagentExecutionOptions,
   toolUi?: ToolUi,
 ): Promise<unknown> {
-  if (name === 'zsh') {
+  if (name === 'bash') {
     return bashTool(stringArg(name, args, 'command'));
   }
   if (name === 'file_write') {
@@ -139,13 +145,15 @@ async function executeToolCall(
     );
   }
   if (name === 'plan_maker') {
-    const steps = workflowStepsArg(args);
+    // Steps run with the caller's role, limited to that role's step tools.
+    const role = subagentOptions.role ?? 'subagent';
+    const steps = workflowStepsArg(args, PLAN_STEP_TOOLS[role]);
     toolUi?.onNotice?.({
       label: 'plan',
       message: 'plan scheduled · handing work to the command queue',
       tone: 'blue',
     });
-    return toolScheduler(hooks, steps, subagentOptions, toolUi);
+    return toolScheduler(hooks, steps, { ...subagentOptions, role }, toolUi);
   }
   if (name === 'skill_maker') {
     generatedSkills = typeof args.skills === 'string' ? args.skills : '';
@@ -182,6 +190,12 @@ export async function dispatchTool(
   toolUi?: ToolUi,
 ): Promise<string> {
   const name = canonicalToolName(requestedName);
+  const violation = subagentOptions.role
+    ? roleViolation(subagentOptions.role, name)
+    : undefined;
+  if (violation) {
+    return JSON.stringify({ success: false, errorMessage: violation });
+  }
   const context: HookContext = { tool: { name, args } };
   const decision = await firePreHooks(hooks, context);
   if (decision === 'deny') {
@@ -337,14 +351,14 @@ function buildHooks(toolUi?: ToolUi): Hooks {
   const hooks = createHooks();
   addPreHook(hooks, async ({ tool }) => {
     toolUi?.onToolStarted({ name: tool.name, args: tool.args });
-    if (tool.name !== 'zsh') return 'allow';
+    if (tool.name !== 'bash') return 'allow';
     // RELAY_AUTO_APPROVE=1 is for unattended runs (CI, sandboxed benchmarks)
     // where nobody can answer the prompt.
     const command = stringArg(tool.name, tool.args, 'command', {
       optional: true,
     });
     const allowed =
-      !command.includes('rm') ||
+      !deletesFiles(command) ||
       process.env.RELAY_AUTO_APPROVE === '1' ||
       (await askPermission(tool.name, tool.args, toolUi));
     if (!allowed) {
@@ -367,7 +381,7 @@ function buildHooks(toolUi?: ToolUi): Hooks {
     const errSuffix =
       !ok && res?.errorMessage ? ` - Error: ${res.errorMessage}` : '';
     const details =
-      tool.name === 'zsh'
+      tool.name === 'bash'
         ? ` [command: "${stringArg(tool.name, tool.args, 'command', { optional: true })}"]`
         : tool.name === 'file_write' || tool.name === 'read_file'
           ? ` [file: ${tool.args.fileName}]`
@@ -401,7 +415,7 @@ HOW TO WORK:
 5. Do not ask subagents to create git commits or branches unless the user asked for that.
 6. Give your final answer (with no tool call) only when the request is complete and verified, summarizing what was done.
 
-Subagents have access to: zsh (a bash shell), file_write, read_file, tool_output_read, grep_search, find_files, git, plan_maker.
+Subagents have access to: bash, file_write, read_file, tool_output_read, grep_search, find_files, git, plan_maker.
 `;
 
 export interface AgentCommandOptions {
@@ -426,13 +440,6 @@ export async function runAgent(
     const hooks = buildHooks(dashboard);
     const session = await getCurrentSession();
     const providerTools = getAllToolsOfProviders(session.provider) as unknown[];
-    const coordinatorNames = new Set([
-      'create_a_subagent',
-      'read_file',
-      'tool_output_read',
-      'plan_maker',
-      'skill_maker',
-    ]);
     const coordinatorTools = providerTools.filter((tool) => {
       const record = tool as Record<string, unknown>;
       const openAiFunction = record.function as
@@ -444,7 +451,7 @@ export async function runAgent(
           : typeof openAiFunction?.name === 'string'
             ? openAiFunction.name
             : '';
-      return coordinatorNames.has(name);
+      return COORDINATOR_TOOLS.has(name);
     });
     runtimeBundle = createLongRunningRuntime({
       workspaceRoot: process.cwd(),
@@ -468,6 +475,7 @@ export async function runAgent(
           args,
           hooks,
           {
+            role: 'coordinator',
             outputManager: runtimeBundle!.toolOutputManager,
             taskId: metadata.taskId,
             runId: metadata.runId,

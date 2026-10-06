@@ -56,7 +56,7 @@ describe('tool argument validation', () => {
       steps: JSON.stringify([{ toolName: 'zsh', args: { comand: 'true' } }]),
     });
     expect(steps).toEqual([
-      { id: 's1', toolName: 'zsh', args: { comand: 'true' }, dependsOn: [] },
+      { id: 's1', toolName: 'bash', args: { comand: 'true' }, dependsOn: [] },
     ]);
   });
 
@@ -78,7 +78,7 @@ describe('tool argument validation', () => {
     const result = parse(
       await dispatchTool('teleport', { command: 'ls' }, createHooks()),
     );
-    expect(result.errorMessage).toContain('Available tools: zsh');
+    expect(result.errorMessage).toContain('Available tools: bash');
   });
 
   test('provider errors are recognized', () => {

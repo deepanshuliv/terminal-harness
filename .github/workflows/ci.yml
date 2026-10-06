@@ -26,7 +26,6 @@ jobs:
   benchmark-adapter:
     name: Harbor adapter tests
     runs-on: ubuntu-latest
-    if: hashFiles('benchmark/tests/*.py') != ''
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

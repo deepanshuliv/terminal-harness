@@ -112,7 +112,7 @@ bun run build
 bun run format
 ```
 
-CI (`.github/workflows/ci.yml`) runs `format:check`, `typecheck`, `bun test`, and `build` on Bun 1.3.13 for every push to `main` and every pull request. When `benchmark/` is present, CI also runs the Harbor adapter tests.
+CI (`.github/workflows/ci.yml`) runs `format:check`, `typecheck`, `bun test`, and `build` on Bun 1.3.13 for every push to `main` and every pull request, plus the Harbor adapter tests in `benchmark/tests`.
 
 ## Limitations
 

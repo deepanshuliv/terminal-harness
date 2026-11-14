@@ -1,125 +1,155 @@
 # Relay
 
-Relay is a durable terminal coding workspace that carries tasks through coordinator and subagent runs, context compaction, verification, and restarts.
+![CI](https://github.com/deepanshuliv/terminal-harness/workflows/CI/badge.svg)
 
-Relay accepts a natural language prompt, breaks it down into a dependency graph of steps, and executes independent tasks concurrently using provider-specific tool capabilities.
+Relay is a terminal coding agent for tasks that outlast one model context. You describe the work in plain English. A coordinator model breaks it down and delegates to subagents, which run shell, file, and git tools in your current directory. Every step is written to a local SQLite store, and each model call is rebuilt from bounded context instead of the full transcript, so a task can survive a restart and resume with `--task-id`.
 
-## Quick Start
+It talks to Google Gemini, OpenAI, Anthropic Claude, and OpenRouter.
 
-Relay requires [Bun](https://bun.sh) to run.
+Source: [github.com/deepanshuliv/terminal-harness](https://github.com/deepanshuliv/terminal-harness)
+
+## Tech stack
+
+| Area | What the code uses |
+|---|---|
+| Runtime and language | [Bun](https://bun.sh), TypeScript |
+| CLI | [Commander.js](https://github.com/tj/commander.js) |
+| Providers | `@google/genai`, `openai`, `@anthropic-ai/sdk`. OpenRouter goes through the `openai` SDK. |
+| Storage | `bun:sqlite` with an FTS5 full-text index |
+| Tests | `bun test` for the CLI, pytest for the Harbor benchmark adapter |
+| Formatting | Prettier |
+
+## Requirements
+
+- Bun. CI runs on Bun 1.3.13.
+- An API key for one of the supported providers.
+
+## Installation
 
 ```bash
-# Install dependencies
 bun install
 
-# Optional: put the `relay` command on your PATH (package.json "bin")
+# Optional: put the `relay` command on your PATH
 bun link
-
-# Authenticate with an AI provider (google, openai, claude, or openrouter)
-relay providers login -p google -a <YOUR_API_KEY>
-
-# Select a model
-relay models set -m gemini-3.5-flash
-
-# Run a task
-relay agent -p "Search for all instances of console.log and remove them"
-
-# Open the interactive terminal prompt
-relay ui
 ```
 
-Without `bun link`, use `bun run cli.ts` wherever this README says `relay`.
-
-## Features
-
-- **Multi-provider**: Supports Google (Gemini), OpenAI, Anthropic Claude, and OpenRouter (OpenAI-compatible, `https://openrouter.ai/api/v1`).
-- **Concurrent Execution**: A `plan_maker` tool builds a task dependency graph. The internal scheduler executes tasks without dependencies in parallel.
-- **Agent Delegation**: A coordinator agent plans the work and delegates file system and terminal operations to subagents.
-- **Best Practices Injection**: The coordinator generates context-specific best practices using `skill_maker` and injects them into subagent prompts.
-- **Safe Execution**: Shell commands that delete files (`rm`, `rmdir`, `unlink`, `shred`, `find -delete`, `git clean -f`, including behind `sudo`, `xargs` or `&&`) require explicit `y/N` confirmation. Set `RELAY_AUTO_APPROVE=1` only for unattended runs in a disposable environment.
-- **Ink & Ember terminal UI**: A quiet, scrollback-friendly command stream shows live state, exact commands, context rebuilds, verification, and the final response without fake reasoning or dashboard clutter.
-
-### Terminal UI
-
-The product name is **Relay**. Its theme is **Ink & Ember**: ink `#101316`, paper `#E8ECEE`, slate `#9AA5AC`, ember `#D39A6C`, quiet blue `#7DA8B8`, leaf `#8FBF9F`, amber `#D4AD73`, and brick `#D17B72`.
-
-Use `relay ui` (or `bun run cli.ts ui`) for an interactive prompt that can continue with another task, and `relay agent -p "..."` for print/automation mode. Both paths use the same durable runtime. The UI only reports observable work: commands, bounded results, context rebuilds, verification, and status transitions. It does not render hidden chain-of-thought or simulate activity with a spinner.
-
-Intentionally excluded: spinners and simulated activity, rendered model reasoning, and dashboard panels. Color and the live status line appear only on a TTY and are disabled by `NO_COLOR`. When output is piped, Relay prints plain lines.
-
-## Architecture
-
-Relay separates planning from execution:
-
-1. **Coordinator**: Evaluates the user prompt and delegates work using `create_a_subagent` and `plan_maker`. It can only call `create_a_subagent`, `read_file`, `tool_output_read`, `plan_maker`, and `skill_maker`. Its plan steps may only use `create_a_subagent`, `read_file`, and `tool_output_read`, so it never executes terminal commands directly.
-2. **Subagents**: Spawned by the coordinator on the session's provider and model, these agents execute shell commands (`bash`; `zsh` is accepted as an alias), file operations (`file_write`, `read_file`, `grep_search`, `find_files`), and Git operations (`git`). Subagents cannot spawn subagents.
-3. **Scheduler**: A custom queue resolves dependencies from the execution plan and runs up to 5 parallel workers.
-
-### Long-running execution
-
-Agent runs use a durable SQLite execution store at `.relay/execution.sqlite` (provider credentials remain in `database.json`). Workspaces created before the rename keep using an existing `.opencode/execution.sqlite`. `RELAY_STATE_DIR` moves the state directory elsewhere. The active model view is rebuilt for every iteration from bounded categories: system/project instructions, typed `TaskState`, the latest versioned summary, selected high-value events, on-demand FTS5 history, and the current input. The complete conversation is never required in memory.
-
-The runtime is split into class-based managers:
-
-- `TaskStateManager` persists objective, plan, progress, decisions, constraints, files, failures, blockers, next steps, and verification state with optimistic versions.
-- `EventStore` records observable execution facts and indexes them in SQLite FTS5 without storing hidden chain-of-thought.
-- `ContextBudgetManager` estimates tokens conservatively and reserves response/safety capacity before every provider call.
-- `ContextManager` selects mandatory and optional context by explicit priority.
-- `CompactionManager` creates versioned summaries before the budget is exhausted and falls back to deterministic TaskState reconstruction on failure.
-- `ToolOutputManager` keeps small output inline and externalizes large output under `.relay/tool-outputs`; the `tool_output_read` tool retrieves ranges later.
-- `HistoryRetriever`, `VerificationManager`, and `CheckpointManager` provide bounded recall, evidence-driven completion, and workspace checkpoint metadata.
-
-The CLI accepts `--task-id <id>` to resume a persisted task, `--context-tokens <n>` to force a small safe capacity, `--max-iterations <n>` to bound a run, and `--verify` to run discovered project checks before a task can be marked complete.
+If you skip `bun link`, run `bun run cli.ts` wherever this README says `relay`.
 
 ## Configuration
 
-Credentials and model preferences are stored in a `database.json` file created in the directory where the CLI is run. The file is written with owner-only permissions (`0600`), and `providers login` only prints a masked key. Keys are not encrypted, so keep `database.json` out of shared directories.
+Log in to a provider and pick a model. The provider name is `google`, `openai`, `claude`, or `openrouter`.
 
 ```bash
-# Switch providers
-relay providers login -p claude -a <API_KEY>
-
-# List available models for the active provider
+relay providers login -p google -a <YOUR_API_KEY>
 relay models ls
+relay models set -m gemini-3.5-flash
 ```
 
-For CI, containers, and other unattended runs, configure the session through environment variables instead. Nothing is written to disk:
+`relay models ls` prints the models for every provider. `relay providers set` switches the active provider and `relay providers logout` removes one.
+
+The key and model are saved to `database.json` in the directory where you run the command. Relay writes that file with owner-only permissions (`0600`) and prints only a masked key, but the key is stored unencrypted. Keep `database.json` out of shared directories.
+
+For CI, containers, and other unattended runs, use environment variables instead. Nothing gets written to disk.
 
 | Variable | Purpose |
 |---|---|
-| `RELAY_PROVIDER`, `RELAY_MODEL` | provider (`google`, `openai`, `claude`, `openrouter`) and model id |
+| `RELAY_PROVIDER`, `RELAY_MODEL` | Provider (`google`, `openai`, `claude`, `openrouter`) and model id. Without `RELAY_MODEL`, Relay uses the provider's first listed model. |
 | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | API key for the selected provider |
-| `RELAY_STATE_DIR` | directory for the SQLite store, tool outputs and checkpoints (default `.relay`) |
-| `RELAY_COMMAND_TIMEOUT_MS` | timeout for shell and git commands (default `180000`) |
-| `RELAY_AUTO_APPROVE` | `1` skips the delete-confirmation prompt |
-| `RELAY_MAX_OUTPUT_TOKENS`, `RELAY_RETRY_ATTEMPTS`, `OPENROUTER_BASE_URL`, `RELAY_USAGE_LOG` | OpenRouter completion cap (8192), retry attempts (10), endpoint, per-request usage log |
-| `NO_COLOR` | disable terminal colors |
+| `RELAY_STATE_DIR` | Where the SQLite store, tool outputs, and checkpoints go (default `.relay`) |
+| `RELAY_COMMAND_TIMEOUT_MS` | Timeout for shell and git commands (default `180000`) |
+| `RELAY_AUTO_APPROVE` | `1` skips the delete confirmation prompt |
+| `RELAY_MAX_OUTPUT_TOKENS`, `RELAY_RETRY_ATTEMPTS` | OpenRouter completion cap (default `8192`) and retry attempts (default `10`) |
+| `OPENROUTER_BASE_URL`, `RELAY_USAGE_LOG` | OpenRouter endpoint, and a file that gets one line of metadata per model request |
+| `NO_COLOR` | Turn off terminal colors |
+
+## Quick start
+
+Run one task and exit:
+
+```bash
+relay agent -p "Search for all instances of console.log and remove them"
+```
+
+Or open the interactive prompt, which asks for another task when the current one finishes:
+
+```bash
+relay ui
+```
+
+Both commands take the same options:
+
+| Option | Default | What it does |
+|---|---|---|
+| `--task-id <id>` | | Resume a saved task |
+| `--context-tokens <n>` | `32000` | Context capacity Relay plans each model call around |
+| `--max-iterations <n>` | `500` | Upper limit on model and tool iterations |
+| `--verify` | off | Run the project's checks before the task can be marked complete |
+
+Before a shell command deletes files (`rm`, `rmdir`, `unlink`, `shred`, `find -delete`, `git clean -f`, also behind `sudo`, `xargs`, or `&&`), Relay asks you to confirm with `y/N`. Set `RELAY_AUTO_APPROVE=1` only in a disposable environment.
+
+The `Dockerfile` builds an image with Bun and git whose entrypoint is the CLI and whose working directory is `/workspace`.
+
+## Architecture
+
+```mermaid
+flowchart TD
+  cli["relay agent / relay ui<br/>(cli.ts, Commander)"] --> runtime["LongRunningAgentRuntime<br/>iteration loop"]
+  runtime -->|"rebuilds context every iteration"| ctx["ContextManager +<br/>ContextBudgetManager"]
+  ctx --> adapter["Provider adapter<br/>Gemini · OpenAI · Claude · OpenRouter"]
+  adapter -->|"tool calls"| dispatch["dispatchTool<br/>role check → pre-hooks → tool → post-hooks"]
+  dispatch --> coord["Coordinator tools<br/>create_a_subagent · plan_maker · skill_maker<br/>read_file · tool_output_read"]
+  coord -->|"create_a_subagent"| sub["Subagent loop<br/>runs until it replies DONE:"]
+  coord -->|"plan_maker"| sched["Scheduler<br/>dependency graph, up to 5 parallel steps"]
+  sched --> sub
+  sub --> tools["bash · file_write · read_file<br/>grep_search · find_files · git"]
+  tools --> ws[("Workspace<br/>process.cwd()")]
+  runtime --> db[("SQLite: .relay/execution.sqlite<br/>tasks · runs · events · summaries<br/>tool_outputs · checkpoints · FTS5")]
+  dispatch -->|"large output"| out[(".relay/tool-outputs")]
+```
+
+### A run, step by step
+
+1. `relay agent` loads the session from `RELAY_PROVIDER` or `database.json`, then creates a task in SQLite or loads it with `--task-id`.
+2. Each iteration rebuilds the model's context from bounded parts: system and project instructions, the typed task state, the latest summary, selected events, history pulled from the FTS5 index, and the current input. When the budget runs low, `CompactionManager` writes a new versioned summary. If summarizing fails, it rebuilds from the task state instead.
+3. The coordinator gets five tools: `create_a_subagent`, `plan_maker`, `skill_maker`, `read_file`, and `tool_output_read`. It never runs a shell itself. `dispatchTool` checks every call against the caller's role, and that includes steps inside a `plan_maker` plan, so a plan can't hand the coordinator a shell.
+4. A subagent uses the session's provider and model. It can call `bash` (`zsh` is an alias), `file_write`, `read_file`, `grep_search`, `find_files`, `git`, `tool_output_read`, and `plan_maker`. It keeps going until it replies with `DONE:` and no tool call. Subagents can't start other subagents.
+5. `plan_maker` takes steps with `dependsOn` ids. The scheduler starts the steps that have no unmet dependencies, up to 5 at a time, and queues the rest until their dependencies finish.
+6. Small tool output stays in the conversation. Large output goes to `.relay/tool-outputs`, and the model reads it back in ranges with `tool_output_read`.
+7. When the coordinator answers without a tool call, the run ends. With `--verify`, Relay first runs whichever of the workspace's `typecheck`, `lint`, `test`, `build`, and `format:check` scripts exist in `package.json`. If one fails, the failure is saved and the run carries on to fix it.
+
+Bad tool arguments, unknown tools, and failed commands come back to the model as error messages. A provider error (rate limit, payment, server error) stops the run.
+
+### Terminal UI
+
+The UI shows only what happened: commands, trimmed results, context rebuilds, verification, and status changes. There's no spinner, and model reasoning isn't printed. Colors and the live status line appear only on a TTY. Piped output is plain text.
+
+## Benchmark
+
+[`benchmark/`](benchmark/README.md) runs Relay against mini-swe-agent on Terminal-Bench 2.0 tasks through Harbor, with the same model, dataset, and Docker setup for both. On a 5-task held-out set, Relay passed 4 and mini-swe-agent passed 3, while using more requests and time. The report treats a 1-task gap as within run-to-run noise. See [`benchmark/results/REPORT.md`](benchmark/results/REPORT.md) for the per-task results and how they were measured.
 
 ## Development
 
-The CLI is built with [Commander.js](https://github.com/tj/commander.js) and TypeScript.
-
 ```bash
-# Check formatting
 bun run format:check
-
-# Typecheck, test, and bundle
 bun run typecheck
 bun test
 bun run build
-
-# Format files
-bun run format
 ```
 
-CI (`.github/workflows/ci.yml`) runs `format:check`, `typecheck`, `bun test`, and `build` on Bun 1.3.13 for every push to `main` and every pull request, plus the Harbor adapter tests in `benchmark/tests`.
+`bun run format` fixes formatting. The test suites in `tests/` cover task state and restarts, context budgets, compaction and retrieval, tool argument validation, role-scoped tools, the delete check, and OpenRouter retries and usage logging.
+
+CI (`.github/workflows/ci.yml`) runs the four commands above on every push to `main` and every pull request. It also runs the Harbor adapter tests:
+
+```bash
+uv run --python 3.13 --with harbor==0.23.0 --with pytest pytest -c benchmark/pytest.ini --rootdir benchmark benchmark/tests -q
+```
 
 ## Limitations
 
-- Provider credentials and model preferences (`database.json`) remain scoped to `process.cwd()` and are stored unencrypted (owner-only file permissions). Execution state is stored in `.relay/execution.sqlite` beside the workspace unless `RELAY_STATE_DIR` is set.
-- The default tokenizer is a conservative character-based estimator. Provider-specific tokenizers can be injected through `TokenEstimator` when a provider tokenizer is available.
-- `--verify` is opt-in for backward-compatible CLI behavior; without it, a final response leaves the task unverified and does not falsely mark it complete.
-- Checkpoints capture Git metadata and binary diffs; automatic workspace restoration is intentionally not performed.
-- The `bash` and `git` tools run commands with a 180-second timeout (`RELAY_COMMAND_TIMEOUT_MS`). Long jobs should run in the background and be polled.
-- The delete-confirmation check is a heuristic over command words, not a shell parser. It asks for some quoted strings that only look like separators, and it does not cover every destructive command (for example `dd` or `mv` over existing files).
-- Concurrent file writes are queued via a local lock to prevent race conditions, which relies on single-process memory.
+- `database.json` is tied to the directory you run Relay in, and keys in it are not encrypted.
+- Token counts come from a conservative character-based estimate. You can plug in a provider tokenizer through `TokenEstimator`.
+- Without `--verify`, a finished run leaves the task unverified instead of marking it complete.
+- Checkpoints record git metadata and binary diffs. Relay does not restore the workspace from them automatically.
+- Shell and git commands time out after 180 seconds by default. Start long jobs in the background and poll them.
+- The delete check matches command words and is not a shell parser. It sometimes asks about quoted strings that only look like separators, and it misses some destructive commands, such as `dd` or `mv` over an existing file.
+- File writes are serialized with an in-memory lock, so the protection only holds within one Relay process.
